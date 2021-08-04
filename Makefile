@@ -54,6 +54,10 @@ else
 	aws s3 sync s3://$(BUCKET)/data/ data/ --profile $(PROFILE)
 endif
 
+## update environment
+update_environment:
+	$(PYTHON_INTERPRETER) -m pip freeze > requirements.txt
+
 ## Set up python interpreter environment
 create_environment:
 ifeq (True,$(HAS_CONDA))
