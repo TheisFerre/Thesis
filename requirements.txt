@@ -48,6 +48,7 @@ MarkupSafe==2.0.1
 matplotlib==3.4.2
 matplotlib-inline==0.1.2
 mccabe==0.6.1
+meteostat==1.5.7
 mistune==0.8.4
 mypy-extensions==0.4.3
 nbclient==0.5.3
@@ -100,7 +101,7 @@ sphinxcontrib-htmlhelp==2.0.0
 sphinxcontrib-jsmath==1.0.1
 sphinxcontrib-qthelp==1.0.3
 sphinxcontrib-serializinghtml==1.1.5
--e git+https://github.com/TheisFerre/Thesis.git@018f63a11148ac9ea4207790595392762cfa9c1a#egg=src
+-e git+https://github.com/TheisFerre/Thesis.git@2899c1156b516b023e9b06ad5c32be9fcf40d1b7#egg=src
 terminado==0.10.1
 testpath==0.5.0
 threadpoolctl==2.2.0
