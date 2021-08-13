@@ -94,7 +94,7 @@ def create_grid_ids(df: pd.DataFrame, longitude_col: str, lattitude_col: str) ->
 
 
 def correlation_adjacency_matrix(
-    rides_df: pd.DataFrame, region_ordering: List[str], id_col: str, time_col: str, threshold: float = 0.1
+    rides_df: pd.DataFrame, region_ordering: List[str], id_col: str, time_col: str, threshold: float = 0.25
 ) -> pd.DataFrame:
     """
     Creates adjacency matrix, where the correlation of historical rides
@@ -126,8 +126,9 @@ def correlation_adjacency_matrix(
 
             corr_coef = np.abs(np.corrcoef(node1_val_list, node2_val_list)[0, 1])
             if corr_coef > threshold:
-                correlation_graph[i, j] = corr_coef
-                correlation_graph[j, i] = corr_coef
+                # in paper it is set to 1, whenever above threshold
+                correlation_graph[i, j] = 1  # corr_coef
+                correlation_graph[j, i] = 1  # corr_coef
 
     return correlation_graph
 
