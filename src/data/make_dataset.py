@@ -4,9 +4,10 @@ from src.data.process_dataset import (
     create_grid,
     create_grid_ids,
     correlation_adjacency_matrix,
-    features_and_targets,
+    features_targets_and_externals,
     Dataset,
 )
+from src.data.encode_externals import Weather_container, time_encoder
 import json
 import os
 import dill
@@ -58,11 +59,31 @@ def main(input_filepath, output_filepath):
                 rides_df=df, region_ordering=region_ordering, id_col="grid_id", time_col=column_dict["TIME_COL"]
             )
 
-            X, targets = features_and_targets(
-                df=df, region_ordering=region_ordering, id_col="grid_id", time_col=column_dict["TIME_COL"]
+            # encode time & weather
+            mean_lon = df[column_dict["LNG_COL"]].mean()
+            mean_lat = df[column_dict["LAT_COL"]].mean()
+            weather = Weather_container(longitude=mean_lon, latitude=mean_lat)
+
+            time_enc = time_encoder()
+
+            X, targets, time_encoding, weather_array = features_targets_and_externals(
+                df=df, region_ordering=region_ordering, id_col="grid_id", time_col=column_dict["TIME_COL"], time_encoder=time_enc, weather=weather
             )
 
-            dat = Dataset(adjacency_matrix=adj_mat, targets=targets, X=X)
+            
+            """weather_array = weather.get_weather_df(
+                start=min(df[column_dict["TIME_COL"]]), end=max(df[column_dict["TIME_COL"]])
+            )
+
+            time_encoding = encode_times(datetime_series=df[column_dict["TIME_COL"]])"""
+
+            dat = Dataset(
+                adjacency_matrix=adj_mat,
+                targets=targets,
+                X=X,
+                weather_information=weather_array,
+                time_encoding=time_encoding,
+            )
 
             logger.info(f"SAVING PROCESSED DATA TO {output_filepath}/{infile_root}.pkl")
             outfile = open(f"{output_filepath}/{infile_root}.pkl", "wb")

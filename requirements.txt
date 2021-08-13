@@ -101,7 +101,7 @@ sphinxcontrib-htmlhelp==2.0.0
 sphinxcontrib-jsmath==1.0.1
 sphinxcontrib-qthelp==1.0.3
 sphinxcontrib-serializinghtml==1.1.5
--e git+https://github.com/TheisFerre/Thesis.git@2899c1156b516b023e9b06ad5c32be9fcf40d1b7#egg=src
+-e git+https://github.com/TheisFerre/Thesis.git@e5ebf7fad78f34b33bbe38ed9fa2c04ad40be3ee#egg=src
 terminado==0.10.1
 testpath==0.5.0
 threadpoolctl==2.2.0

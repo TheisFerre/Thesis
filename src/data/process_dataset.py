@@ -6,6 +6,9 @@ import scipy
 from torch_geometric_temporal.signal import StaticGraphTemporalSignal, temporal_signal_split
 from torch_geometric.utils import from_scipy_sparse_matrix
 import torch
+from sklearn.preprocessing import OneHotEncoder
+from src.data.encode_externals import Weather_container
+from datetime import timedelta
 
 
 def load_csv_dataset(
@@ -133,13 +136,41 @@ def correlation_adjacency_matrix(
     return correlation_graph
 
 
-def features_and_targets(df: pd.DataFrame, region_ordering: List[str], id_col: str, time_col: str):
+def features_targets_and_externals(
+    df: pd.DataFrame,
+    region_ordering: List[str],
+    id_col: str,
+    time_col: str,
+    time_encoder: OneHotEncoder,
+    weather: Weather_container,
+):
+    """
+    Function that computes the node features (outflows), target values (next step prediction)
+    and external data such as time_encoding and weather information
+
+    Args:
+        df (pd.DataFrame): [description]
+        region_ordering (List[str]): [description]
+        id_col (str): [description]
+        time_col (str): [description]
+        time_encoder (OneHotEncoder): [description]
+        weather (Weather_container): [description]
+
+    Returns:
+        [type]: [description]
+    """
 
     grouped_df = df.groupby([time_col, id_col])
 
     node_inflows = np.zeros((len(df[time_col].unique()), len(region_ordering), 1))
     targets = np.zeros((len(df[time_col].unique()) - 1, len(region_ordering)))
 
+    # arrays for external data
+    weather_external = np.zeros((len(df[time_col].unique()), 4))
+    time_external = np.zeros((len(df[time_col].unique()), 26))
+
+    # Loop through every (timestep, node) pair in dataset. For each find number of outflows and set as feature
+    # also set the next timestep for the same node as the target.
     for t, starttime in tqdm(enumerate(df[time_col].unique()), total=len(df[time_col].unique())):
         for i, node in enumerate(region_ordering):
 
@@ -155,12 +186,23 @@ def features_and_targets(df: pd.DataFrame, region_ordering: List[str], id_col: s
             # The target to predict, is the number of inflows at next timestep.
             if t > 0:
                 targets[t - 1, i] = node_inflows[t, i]
-            else:
-                targets[t - 1, i] = node_inflows[t, i]
+
+        time_obj = group[time_col].iloc[0]
+        time_external[t, :] = time_encoder.transform(
+            np.array([[time_obj.hour, time_obj.weekday(), time_obj.month]])
+        ).toarray()
+
+        start_time_dt = pd.Timestamp(starttime).to_pydatetime()
+
+        weather_dat = weather.get_weather_df(start=start_time_dt, end=start_time_dt + timedelta(hours=1))
+        weather_external[t, :] = weather_dat
+
+    time_external = time_external[:-1, :]
+    weather_external = weather_external[:-1, :]
 
     X = node_inflows[:-1, :, :]
 
-    return X, targets
+    return X, targets, time_external, weather_external
 
 
 def get_adjacency_matrix(distance_df, sensor_ids, normalized_k=0.1):
@@ -200,11 +242,20 @@ def get_adjacency_matrix(distance_df, sensor_ids, normalized_k=0.1):
 
 
 class Dataset:
-    def __init__(self, adjacency_matrix: np.array, targets: np.array, X: np.array):
+    def __init__(
+        self,
+        adjacency_matrix: np.array,
+        targets: np.array,
+        X: np.array,
+        weather_information: np.array = None,
+        time_encoding: np.array = None,
+    ):
         self.adjacency_matrix = adjacency_matrix
         self.scipy_graph = scipy.sparse.lil_matrix(adjacency_matrix)
         self.targets = targets
         self.X = X
+        self.weather_information = weather_information
+        self.time_encoding = time_encoding
         self.edge_index, self.edge_weight = from_scipy_sparse_matrix(self.scipy_graph)
         self.edge_weight = self.edge_weight.type(torch.FloatTensor)
 
