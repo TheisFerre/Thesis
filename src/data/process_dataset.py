@@ -3,7 +3,8 @@ from typing import List, Union
 import numpy as np
 from tqdm import tqdm
 import scipy
-from torch_geometric_temporal.signal import StaticGraphTemporalSignal, temporal_signal_split
+from torch_geometric_temporal.signal import StaticGraphTemporalSignal  # , temporal_signal_split
+from src.models.models import CustomTemporalSignal
 from torch_geometric.utils import from_scipy_sparse_matrix
 import torch
 from sklearn.preprocessing import OneHotEncoder
@@ -260,14 +261,19 @@ class Dataset:
         self.edge_weight = self.edge_weight.type(torch.FloatTensor)
 
     def create_temporal_dataset(self):
-        dataset = StaticGraphTemporalSignal(
-            edge_index=self.edge_index, edge_weight=self.edge_weight, features=self.X, targets=self.targets
+        dataset = CustomTemporalSignal(
+            weather_information=self.weather_information,
+            time_encoding=self.time_encoding,
+            edge_index=self.edge_index,
+            edge_weight=self.edge_weight,
+            features=self.X,
+            targets=self.targets,
         )
         return dataset
 
     @staticmethod
-    def train_test_split(dataset: Union[StaticGraphTemporalSignal, "Dataset"], ratio: float = 0.8):
-        if isinstance(dataset, StaticGraphTemporalSignal):
+    def train_test_split(dataset: Union[CustomTemporalSignal, "Dataset"], ratio: float = 0.8):
+        if isinstance(dataset, CustomTemporalSignal):
             train, test = temporal_signal_split(dataset, train_ratio=ratio)
         elif isinstance(dataset, Dataset):
             train, test = temporal_signal_split(dataset.create_temporal_dataset(), train_ratio=ratio)
@@ -275,3 +281,27 @@ class Dataset:
             print("input type is not correct...")
 
         return train, test
+
+
+def temporal_signal_split(data_iterator, train_ratio: float = 0.8):
+    train_snapshots = int(train_ratio * data_iterator.snapshot_count)
+
+    train_iterator = CustomTemporalSignal(
+        weather_information=data_iterator.weather_information[0:train_snapshots],
+        time_encoding=data_iterator.time_encoding[0:train_snapshots],
+        edge_index=data_iterator.edge_index,
+        edge_weight=data_iterator.edge_weight,
+        features=data_iterator.features[0:train_snapshots],
+        targets=data_iterator.targets[0:train_snapshots],
+    )
+
+    test_iterator = CustomTemporalSignal(
+        weather_information=data_iterator.weather_information[train_snapshots:],
+        time_encoding=data_iterator.time_encoding[train_snapshots:],
+        edge_index=data_iterator.edge_index,
+        edge_weight=data_iterator.edge_weight,
+        features=data_iterator.features[train_snapshots:],
+        targets=data_iterator.targets[train_snapshots:],
+    )
+
+    return train_iterator, test_iterator
