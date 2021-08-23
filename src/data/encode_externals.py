@@ -6,18 +6,20 @@ import numpy as np
 
 
 class Weather_container:
-    def __init__(self, longitude: float, latitude: float):
+    def __init__(self, longitude: float, latitude: float, time_interval: str = "4H"):
         self.point = Point(lon=longitude, lat=latitude)
+        self.time_interval = time_interval
 
-    def get_weather_df(self, start: datetime, end: datetime):
+    def get_weather_df(self, start: datetime, end: datetime, time_interval="4H"):
 
         data = Hourly(self.point, start=start, end=end)
-        data.aggregate("4H")
+        data.aggregate(self.time_interval)
         data = data.fetch()
+
         return data[["temp", "rhum", "prcp", "wspd"]].values.mean(axis=0)
 
 
-def encode_times(datetime_series: pd.Series, time_interval="4H"):
+def encode_times(datetime_series: pd.Series):
     """
     Creates a time-encoded numpy array.
     Encoding is given by: HOUR X DAY X MONTH
@@ -75,15 +77,6 @@ def time_encoder(time_interval="4H"):
         datetime_series (pd.Series): contains all datetimes
         time_interval (str, optional): Defaults to "4H".
     """
-    #datetime_series = datetime_series.unique()
-    #print(datetime_series[0])
-
-    #hour = datetime_series.apply(lambda x: x.hour).values
-    #day = datetime_series.apply(lambda x: x.weekday()).values
-    #month = datetime_series.apply(lambda x: x.month).values
-    #hour = np.apply_along_axis(lambda x: x.hour, axis=0, arr=datetime_series)
-    #day = np.apply_along_axis(lambda x: x.weekday(), axis=0, arr=datetime_series)
-    #month = np.apply_along_axis(lambda x: x.month, axis=0, arr=datetime_series)
 
     # hard code a OneHotEncoder that can be used
     encoder = OneHotEncoder()
@@ -92,8 +85,6 @@ def time_encoder(time_interval="4H"):
         x_artificial = np.ones((int(24 / time_int), 3))
     else:
         x_artificial = np.ones((24, 3))
-
-    
 
     # hour encoding:
     for i in range(int(24 / time_int)):
