@@ -67,12 +67,12 @@ def main(input_filepath, output_filepath):
                         region_ordering = np.append(region_ordering, grid_id)
 
             # CORRELATION ADJ MATRIX
-            #adj_mat = correlation_adjacency_matrix(
-            #    rides_df=df, region_ordering=region_ordering, id_col="grid_id", time_col=file_dict["TIME_COL"]
-            #)
+            adj_mat = correlation_adjacency_matrix(
+                rides_df=df, region_ordering=region_ordering, id_col="grid_id", time_col=file_dict["TIME_COL"]
+            )
 
             # NEIGHBOURHOOD ADJ MATRIX
-            adj_mat = neighbourhood_adjacency_matrix(region_ordering=region_ordering)
+            #adj_mat = neighbourhood_adjacency_matrix(region_ordering=region_ordering)
 
             # encode time & weather
             mean_lon = df[file_dict["LNG_COL"]].mean()
@@ -93,11 +93,6 @@ def main(input_filepath, output_filepath):
                 time_interval=file_dict["HOUR_INTERVAL"] + "H"
             )
 
-            """weather_array = weather.get_weather_df(
-                start=min(df[file_dict["TIME_COL"]]), end=max(df[file_dict["TIME_COL"]])
-            )
-
-            time_encoding = encode_times(datetime_series=df[file_dict["TIME_COL"]])"""
 
             dat = Dataset(
                 adjacency_matrix=adj_mat,
