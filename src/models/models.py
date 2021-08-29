@@ -523,9 +523,11 @@ class Edgeconvmodel(torch.nn.Module):
         batch_size, num_hist, nodes = data.x.shape
         # SHAPE (SEQ LENGTH, BATCHSIZE X NUM_NODES, NODE_OUT_FEATURES)
         lstm_inputs = torch.zeros((num_hist, batch_size * nodes, self.node_out_features))
+        if next(self.parameters()).device.type == "cuda":
+            lstm_inputs = lstm_inputs.cuda()
 
         for i in range(num_hist):
-            x= data.x[:, i, :]
+            x = data.x[:, i, :]
             lat, lng = data.latitude[:, i, :], data.longitude[:, i, :]
             lat = lat.reshape(-1, 1)
             lng = lng.reshape(-1, 1)
