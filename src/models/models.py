@@ -2,7 +2,7 @@ import torch
 from torch.functional import einsum
 import torch.nn.functional as F
 from torch_geometric_temporal.signal import StaticGraphTemporalSignal
-from torch_geometric.nn import GCNConv, GraphConv, GATv2Conv
+from torch_geometric.nn import GCNConv, GraphConv, GATv2Conv, DynamicEdgeConv
 from torch_geometric.data import Data
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Dataset
@@ -10,21 +10,16 @@ from torch.utils.data import Dataset
 
 class CustomData(Data):
     def __cat_dim__(self, key, value):
-        cat_set = {"weather", "time_encoding", "y"}
+        cat_set = {"weather", "time_encoding", "y", "latitude", "longitude"}
         if key in cat_set:
             return None
         else:
             return super().__cat_dim__(key, value)
 
+
 class CustomTemporalSignal(Dataset):
     def __init__(
-        self, 
-        weather_information,
-        time_encoding,
-        edge_index,
-        edge_weight,
-        features,
-        targets,
+        self, weather_information, time_encoding, edge_index, edge_weight, features, targets, latitude, longitude
     ):
         self.edge_index = edge_index
         self.edge_weight = edge_weight
@@ -36,9 +31,23 @@ class CustomTemporalSignal(Dataset):
         # mean over time and number of examples
         self.features_scaled = self.feature_scaler.fit_transform(self.features.view(-1, self.features.shape[-1]))
         self.features_scaled = self.features_scaled.reshape(self.features.shape)
+        self.latitude = torch.Tensor(latitude)
+        self.longitude = torch.Tensor(longitude)
 
         self.target_scaler = StandardScaler()
         self.targets_scaled = self.target_scaler.fit_transform(self.targets)
+
+    def _get_latitude(self, index: int):
+        if self.latitude[index] is None:
+            return self.latitude[index]
+        else:
+            return torch.FloatTensor(self.latitude[index])
+
+    def _get_longitude(self, index: int):
+        if self.longitude[index] is None:
+            return self.longitude[index]
+        else:
+            return torch.FloatTensor(self.longitude[index])
 
     def _get_weather(self, index: int):
         if self.weather_information[index] is None:
@@ -100,10 +109,14 @@ class CustomTemporalSignal(Dataset):
         y = self._get_target(index)
         weather = self._get_weather(index)
         time_encoding = self._get_time(index)
+        latitude = self._get_latitude(index)
+        longitude = self._get_longitude(index)
 
         snapshot = CustomData(x=x, edge_index=edge_index, edge_attr=edge_weight, y=y)
         snapshot.weather = weather
         snapshot.time_encoding = time_encoding
+        snapshot.latitude = latitude
+        snapshot.longitude = longitude
         return snapshot
 
     def __get_item__(self, time_index: int):
@@ -115,10 +128,14 @@ class CustomTemporalSignal(Dataset):
         y = self._get_target(time_index)
         weather = self._get_weather(time_index)
         time_encoding = self._get_time(time_index)
+        latitude = self._get_latitude(time_index)
+        longitude = self._get_longitude(time_index)
 
         snapshot = CustomData(x=x, edge_index=edge_index, edge_attr=edge_weight, y=y)
         snapshot.weather = weather
         snapshot.time_encoding = time_encoding
+        snapshot.latitude = latitude
+        snapshot.longitude = longitude
         return snapshot
 
 
@@ -240,10 +257,10 @@ class GraphModel(torch.nn.Module):
             x, edge_index, edge_weight = data.x[:, i, :], data.edge_index, data.edge_attr
             x = x.reshape(-1, 1)
 
-            x = self.conv1_sh(x=x, edge_index=edge_index)#, edge_weight=edge_weight)
+            x = self.conv1_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
             x = F.relu(x)
             x = F.dropout(x, self.dropout_p, training=self.training)
-            x = self.conv2_sh(x=x, edge_index=edge_index)#, edge_weight=edge_weight)
+            x = self.conv2_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
             x = F.relu(x)
             x = F.dropout(x, p=self.dropout_p, training=self.training)
 
@@ -375,7 +392,161 @@ class STGNNModel(torch.nn.Module):
         cell_state_fused, hidden_state_fused = self.encoder(data)
 
         out, (hidden_state, cell_state) = self.decoder(
-            data.x[:, -1, :].reshape(batch_size, 1, self.num_nodes), hidden_state_fused.unsqueeze(0), cell_state_fused.unsqueeze(0)
+            data.x[:, -1, :].reshape(batch_size, 1, self.num_nodes),
+            hidden_state_fused.unsqueeze(0),
+            cell_state_fused.unsqueeze(0),
         )
 
         return out, (hidden_state, cell_state)
+
+
+class GraphModel(torch.nn.Module):
+    """
+    This model is using a stand GNN layer to embed nodes
+    It computes features for each node in the graph over q time steps.
+    A LSTM model then takes the sequence of q node features (for each node)
+    the last output of the LSTM model is then fed into a linear layer
+    that also takes into account the weather and time features
+    """
+    def __init__(
+        self,
+        node_in_features: int,
+        weather_features: int,
+        time_features: int,
+        node_out_features: int = 8,
+        hidden_size: int = 64,
+        dropout_p: float = 0.3,
+    ):
+        super(GraphModel, self).__init__()
+        self.node_in_features = node_in_features
+        self.weather_features = weather_features
+        self.time_features = time_features
+        self.node_out_features = node_out_features
+        self.hidden_size = hidden_size
+        self.dropout_p = dropout_p
+        self.conv1_sh = GATv2Conv(node_in_features, node_out_features)
+        self.conv2_sh = GATv2Conv(node_out_features, node_out_features)
+        self.lstm = torch.nn.LSTM(
+            input_size=node_out_features,
+            hidden_size=self.hidden_size,
+            batch_first=True,
+        )
+        self.linear = torch.nn.Linear(self.hidden_size + self.weather_features + self.time_features, 1)
+
+    def forward(self, data: Data):
+        batch_size, num_hist, nodes = data.x.shape
+        # SHAPE (SEQ LENGTH, BATCHSIZE X NUM_NODES, NODE_OUT_FEATURES)
+        lstm_inputs = torch.zeros((num_hist, batch_size * nodes, self.node_out_features))
+
+        for i in range(num_hist):
+            x, edge_index, edge_weight = data.x[:, i, :], data.edge_index, data.edge_attr
+            x = x.reshape(-1, 1)
+
+            x = self.conv1_sh(x=x, edge_index=edge_index)#, edge_weight=edge_weight)
+            x = F.relu(x)
+            x = F.dropout(x, self.dropout_p, training=self.training)
+            x = self.conv2_sh(x=x, edge_index=edge_index)#, edge_weight=edge_weight)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout_p, training=self.training)
+            
+
+            lstm_inputs[i, :, :] = x
+        
+        # only take last output
+        out, _ = self.lstm(lstm_inputs)
+        out = out[-1]
+        weather_repeated = data.weather[:, -1, :].repeat(nodes, 1)
+        time_repeated = data.time_encoding[:, -1, :].repeat(nodes, 1)
+        out_embedded = torch.cat([out, weather_repeated, time_repeated], dim=1)
+        
+        prediction = self.linear(out_embedded)
+
+        prediction = prediction.reshape(batch_size, nodes, 1)
+
+        return prediction
+
+
+
+class Edgeconvmodel(torch.nn.Module):
+    """
+    This model is using the Dynamic Edge Convolution operator
+    It computes features for each node in the graph over q time steps.
+    A LSTM model then takes the sequence of q node features (for each node)
+    the last output of the LSTM model is then fed into a linear layer
+    that also takes into account the weather and time features
+    """
+    def __init__(
+        self,
+        node_in_features: int,
+        weather_features: int,
+        time_features: int,
+        node_out_features: int = 8,
+        hidden_size: int = 64,
+        dropout_p: float = 0.3,
+    ):
+        super(Edgeconvmodel, self).__init__()
+        self.node_in_features = node_in_features
+        self.weather_features = weather_features
+        self.time_features = time_features
+        self.node_out_features = node_out_features
+        self.hidden_size = hidden_size
+        self.dropout_p = dropout_p
+        self.lin1 = torch.nn.Sequential(
+            torch.nn.Linear((node_in_features + 2) * 2, (node_in_features + 2) * 4),
+            torch.nn.ReLU(),
+            torch.nn.Linear((node_in_features + 2) * 4, 32),
+        )
+        self.edgeconv1 = DynamicEdgeConv(nn=self.lin1, k=15)
+
+        self.lin2 = torch.nn.Sequential(
+            torch.nn.Linear(64, 64), torch.nn.Dropout(self.dropout_p), torch.nn.ReLU(), torch.nn.Linear(64, 32)
+        )
+        self.edgeconv2 = DynamicEdgeConv(nn=self.lin2, k=15)
+
+        self.lin3 = torch.nn.Sequential(
+            torch.nn.Linear(32 * 2, 32),
+            torch.nn.Dropout(self.dropout_p),
+            torch.nn.ReLU(),
+            torch.nn.Linear(32, node_out_features),
+        )
+        self.edgeconv3 = DynamicEdgeConv(nn=self.lin3, k=15)
+
+        self.lstm = torch.nn.LSTM(
+            input_size=node_out_features,
+            hidden_size=self.hidden_size,
+            batch_first=True,
+        )
+
+        self.linear = torch.nn.Linear(self.hidden_size + self.weather_features + self.time_features, 1)
+
+    def forward(self, data: Data):
+        batch_size, num_hist, nodes = data.x.shape
+        # SHAPE (SEQ LENGTH, BATCHSIZE X NUM_NODES, NODE_OUT_FEATURES)
+        lstm_inputs = torch.zeros((num_hist, batch_size * nodes, self.node_out_features))
+
+        for i in range(num_hist):
+            x= data.x[:, i, :]
+            lat, lng = data.latitude[:, i, :], data.longitude[:, i, :]
+            lat = lat.reshape(-1, 1)
+            lng = lng.reshape(-1, 1)
+            x = x.reshape(-1, 1)
+            x = torch.cat([x, lat, lng], dim=-1)
+
+            x = self.edgeconv1(x)
+            x = self.edgeconv2(x)
+            x = self.edgeconv3(x)
+
+            lstm_inputs[i, :, :] = x
+
+        # only take last output
+        out, _ = self.lstm(lstm_inputs)
+        out = out[-1]
+        weather_repeated = data.weather[:, -1, :].repeat(nodes, 1)
+        time_repeated = data.time_encoding[:, -1, :].repeat(nodes, 1)
+        out_embedded = torch.cat([out, weather_repeated, time_repeated], dim=1)
+
+        prediction = self.linear(out_embedded)
+
+        prediction = prediction.reshape(batch_size, nodes, 1)
+
+        return prediction

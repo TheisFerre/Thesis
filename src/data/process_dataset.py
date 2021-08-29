@@ -184,6 +184,8 @@ def features_targets_and_externals(
     time_encoder: OneHotEncoder,
     weather: Weather_container,
     time_interval: str,
+    latitude: str,
+    longitude: str,
 ):
     """
     Function that computes the node features (outflows), target values (next step prediction)
@@ -201,9 +203,21 @@ def features_targets_and_externals(
         [type]: [description]
     """
 
+    id_grouped_df = df.groupby(id_col)
+    lat_dict = dict()
+    lng_dict = dict()
+    for node in region_ordering:
+        grid_group_df = id_grouped_df.get_group(node)
+        lat_dict[node] = grid_group_df[latitude].mean()
+        lng_dict[node] = grid_group_df[longitude].mean()
+
+
     grouped_df = df.groupby([time_col, id_col])
 
     node_inflows = np.zeros((len(df[time_col].unique()), len(region_ordering), 1))
+    lat_vals = np.zeros((len(df[time_col].unique()), len(region_ordering)))
+    lng_vals = np.zeros((len(df[time_col].unique()), len(region_ordering)))
+
     targets = np.zeros((len(df[time_col].unique()) - 1, len(region_ordering)))
 
     # arrays for external data
@@ -227,6 +241,9 @@ def features_targets_and_externals(
 
             except KeyError:
                 node_inflows[t, i] = 0
+            
+            lat_vals[t, i] = lat_dict[node]
+            lng_vals[t, i] = lng_dict[node]
 
             # current solution:
             # The target to predict, is the number of inflows at next timestep.
@@ -250,6 +267,8 @@ def features_targets_and_externals(
     weather_external = weather_external[:-1, :]
 
     X = node_inflows[:-1, :, :]
+    lng_vals = lng_vals[:-1, :]
+    lat_vals = lat_vals[:-1, :]
 
     feature_scaler = StandardScaler()
     feature_scaler.fit(X[:, :, 0])
@@ -257,7 +276,7 @@ def features_targets_and_externals(
     target_scaler = StandardScaler()
     target_scaler.fit(targets)
 
-    return X, targets, time_external, weather_external, feature_scaler, target_scaler
+    return X, lat_vals, lng_vals, targets, time_external, weather_external, feature_scaler, target_scaler
 
 
 def get_adjacency_matrix(distance_df, sensor_ids, normalized_k=0.1):
@@ -306,6 +325,8 @@ class Dataset:
         time_encoding: np.array = None,
         feature_scaler: StandardScaler = None,
         target_scaler: StandardScaler = None,
+        latitude: np.array = None,
+        longitude: np.array = None,
     ):
         self.adjacency_matrix = adjacency_matrix
         self.scipy_graph = scipy.sparse.lil_matrix(adjacency_matrix)
@@ -315,6 +336,8 @@ class Dataset:
         self.time_encoding = np.expand_dims(time_encoding, -1)
         self.edge_index, self.edge_weight = from_scipy_sparse_matrix(self.scipy_graph)
         self.edge_weight = self.edge_weight.type(torch.FloatTensor)
+        self.latitude = np.expand_dims((latitude - latitude.mean(axis=-1).reshape(-1, 1)) / latitude.std(axis=-1).reshape(-1, 1), -1)
+        self.longitude = np.expand_dims((longitude - longitude.mean(axis=-1).reshape(-1, 1)) / longitude.std(axis=-1).reshape(-1, 1), -1)
 
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
@@ -327,6 +350,8 @@ class Dataset:
         # INITIALIZE TENSORS WITH SHAPES:
         # (NUM_TIMESTEPS, NUM_HISTORY, FEATURES)
         X_prep = torch.zeros((num_timesteps, *self.X[0].repeat(num_history, 1).T.shape))
+        lat_prep = torch.zeros((num_timesteps, *self.latitude[0].repeat(num_history, 1).T.shape))
+        lng_prep = torch.zeros((num_timesteps, *self.longitude[0].repeat(num_history, 1).T.shape))
         weather_prep = torch.zeros((num_timesteps, *self.weather_information[0].repeat(num_history, 1).T.shape))
         time_prep = torch.zeros((num_timesteps, *self.time_encoding[0].repeat(num_history, 1).T.shape))
         targets_prep = torch.zeros((num_timesteps, self.num_nodes))
@@ -334,18 +359,24 @@ class Dataset:
         for i in range(num_history, self.num_observations):
             count = num_history
             graph_tensor = torch.zeros_like(X_prep[0])
+            lat_tensor = torch.zeros_like(lat_prep[0])
+            lng_tensor = torch.zeros_like(lng_prep[0])
             weather_tensor = torch.zeros_like(weather_prep[0])
             time_tensor = torch.zeros_like(time_prep[0])
             while count > 0:
 
                 # INSERT THE LAST NUM_HISTORY TIME SNAPSHOTS
                 graph_tensor[num_history - count, :] = torch.Tensor(self.X[i - count]).squeeze()
+                lat_tensor[num_history - count] = torch.Tensor(self.latitude[i - count]).squeeze()
+                lng_tensor[num_history - count] = torch.Tensor(self.longitude[i - count]).squeeze()
                 weather_tensor[num_history - count] = torch.Tensor(self.weather_information[i - count]).squeeze()
                 time_tensor[num_history - count] = torch.Tensor(self.time_encoding[i - count]).squeeze()
 
                 count -= 1
 
             X_prep[i - num_history] = graph_tensor
+            lat_prep[i - num_history] = lat_tensor
+            lng_prep[i - num_history] = lng_tensor
             weather_prep[i - num_history] = weather_tensor
             time_prep[i - num_history] = time_tensor
 
@@ -353,10 +384,10 @@ class Dataset:
             # THE DEMANDS OF TIMESTEP i
             targets_prep[i - num_history] = torch.Tensor(self.targets[i - 1])
 
-        return X_prep, weather_prep, time_prep, targets_prep
+        return X_prep, lat_prep, lng_prep, weather_prep, time_prep, targets_prep
 
     def create_temporal_dataset(self, num_history: int = 4, scale: bool = True):
-        X_prep, weather_prep, time_prep, targets_prep = self._prep_data(num_history)
+        X_prep, lat_prep, lng_prep, weather_prep, time_prep, targets_prep = self._prep_data(num_history)
 
         if scale:
             X_prep_shape = X_prep.shape
@@ -374,6 +405,8 @@ class Dataset:
             edge_weight=self.edge_weight,
             features=X_prep,
             targets=targets_prep,
+            latitude=lat_prep,
+            longitude=lng_prep
         )
         return dataset
 
@@ -402,6 +435,8 @@ def temporal_signal_split(data_iterator, train_ratio: float = 0.8):
         edge_weight=data_iterator.edge_weight,
         features=data_iterator.features[train_idx],
         targets=data_iterator.targets[train_idx],
+        latitude=data_iterator.latitude,
+        longitude=data_iterator.longitude
     )
 
     test_iterator = CustomTemporalSignal(
@@ -411,6 +446,8 @@ def temporal_signal_split(data_iterator, train_ratio: float = 0.8):
         edge_weight=data_iterator.edge_weight,
         features=data_iterator.features[test_idx],
         targets=data_iterator.targets[test_idx],
+        latitude=data_iterator.latitude,
+        longitude=data_iterator.longitude
     )
 
     return train_iterator, test_iterator

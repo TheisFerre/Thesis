@@ -60,19 +60,19 @@ def main(input_filepath, output_filepath):
             # THIS ORDERING HAS TO BE THE EXACT SAME ALL THE TIME!!!
             region_ordering = df["grid_id"].unique()
             # ADD NODES THAT DONT EXIST (GRID REGIONS WHERE NO OBSERVATIONS OCCUR)
-            for i in range(10):
+            """for i in range(10):
                 for j in range(10):
                     grid_id = f"{i}{j}"
                     if not f"{i}{j}" in region_ordering:
-                        region_ordering = np.append(region_ordering, grid_id)
+                        region_ordering = np.append(region_ordering, grid_id)"""
 
             # CORRELATION ADJ MATRIX
-            adj_mat = correlation_adjacency_matrix(
+            """adj_mat = correlation_adjacency_matrix(
                 rides_df=df, region_ordering=region_ordering, id_col="grid_id", time_col=file_dict["TIME_COL"]
-            )
+            )"""
 
             # NEIGHBOURHOOD ADJ MATRIX
-            #adj_mat = neighbourhood_adjacency_matrix(region_ordering=region_ordering)
+            adj_mat = neighbourhood_adjacency_matrix(region_ordering=region_ordering)
 
             # encode time & weather
             mean_lon = df[file_dict["LNG_COL"]].mean()
@@ -83,16 +83,17 @@ def main(input_filepath, output_filepath):
 
             time_enc = time_encoder(time_interval=file_dict["HOUR_INTERVAL"] + "H")
 
-            X, targets, time_encoding, weather_array, feature_scaler, target_scaler = features_targets_and_externals(
+            X, lat_vals, lng_vals, targets, time_encoding, weather_array, feature_scaler, target_scaler = features_targets_and_externals(
                 df=df,
                 region_ordering=region_ordering,
                 id_col="grid_id",
                 time_col=file_dict["TIME_COL"],
                 time_encoder=time_enc,
                 weather=weather,
-                time_interval=file_dict["HOUR_INTERVAL"] + "H"
+                time_interval=file_dict["HOUR_INTERVAL"] + "H",
+                latitude=file_dict["LAT_COL"],
+                longitude=file_dict["LNG_COL"]
             )
-
 
             dat = Dataset(
                 adjacency_matrix=adj_mat,
@@ -102,6 +103,8 @@ def main(input_filepath, output_filepath):
                 time_encoding=time_encoding,
                 feature_scaler=feature_scaler,
                 target_scaler=target_scaler,
+                latitude=lat_vals,
+                longitude=lng_vals
             )
 
             logger.info(f"SAVING PROCESSED DATA TO {output_filepath}/{infile_root}.pkl")
