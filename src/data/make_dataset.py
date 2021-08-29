@@ -83,7 +83,16 @@ def main(input_filepath, output_filepath):
 
             time_enc = time_encoder(time_interval=file_dict["HOUR_INTERVAL"] + "H")
 
-            X, lat_vals, lng_vals, targets, time_encoding, weather_array, feature_scaler, target_scaler = features_targets_and_externals(
+            (
+                X,
+                lat_vals,
+                lng_vals,
+                targets,
+                time_encoding,
+                weather_array,
+                feature_scaler,
+                target_scaler,
+            ) = features_targets_and_externals(
                 df=df,
                 region_ordering=region_ordering,
                 id_col="grid_id",
@@ -92,7 +101,7 @@ def main(input_filepath, output_filepath):
                 weather=weather,
                 time_interval=file_dict["HOUR_INTERVAL"] + "H",
                 latitude=file_dict["LAT_COL"],
-                longitude=file_dict["LNG_COL"]
+                longitude=file_dict["LNG_COL"],
             )
 
             dat = Dataset(
@@ -104,13 +113,19 @@ def main(input_filepath, output_filepath):
                 feature_scaler=feature_scaler,
                 target_scaler=target_scaler,
                 latitude=lat_vals,
-                longitude=lng_vals
+                longitude=lng_vals,
             )
-
+            clean_data_dict = {
+                "features": X,
+                "targets": targets,
+            }
             logger.info(f"SAVING PROCESSED DATA TO {output_filepath}/{infile_root}.pkl")
             outfile = open(f"{output_filepath}/{infile_root}.pkl", "wb")
             dill.dump(dat, outfile)
+            outfile.close()
 
+            outfile = open(f"{output_filepath}/{infile_root}_nodes.pkl", "wb")
+            dill.dump(clean_data_dict, outfile)
             outfile.close()
 
 

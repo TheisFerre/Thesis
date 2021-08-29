@@ -211,7 +211,6 @@ def features_targets_and_externals(
         lat_dict[node] = grid_group_df[latitude].mean()
         lng_dict[node] = grid_group_df[longitude].mean()
 
-
     grouped_df = df.groupby([time_col, id_col])
 
     node_inflows = np.zeros((len(df[time_col].unique()), len(region_ordering), 1))
