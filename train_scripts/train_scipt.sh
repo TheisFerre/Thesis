@@ -11,7 +11,7 @@
 #BSUB -e logs/%J_Error_nyc_combi.err Error log file
 echo "Starting:"
 
-cd ~/Thesis/models
+cd ~/Thesis/src/models
 #cd /Users/theisferre/Documents/SPECIALE/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
