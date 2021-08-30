@@ -92,3 +92,6 @@ target/
 
 
 src/src
+
+models/*
+notebooks/*

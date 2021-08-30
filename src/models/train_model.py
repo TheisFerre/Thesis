@@ -1,5 +1,6 @@
 from src.models.models import Edgeconvmodel, GATLSTM, Encoder, Decoder, STGNNModel
 import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 import dill
 from src.data.process_dataset import Dataset
@@ -20,6 +21,10 @@ def train_model(
     batch_size: int = 32,
     epochs: int = 200,
     model: str = "edgeconv",
+    weight_decay: float = 0,
+    learning_rate: float = 0.001,
+    lr_factor: float = 1.0,
+    lr_patience: int = 100,
 ):
 
     train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=8, ratio=train_size)
@@ -39,10 +44,7 @@ def train_model(
 
     if model == "edgeconv":
         model = Edgeconvmodel(
-            node_in_features=1,
-            weather_features=weather_features,
-            time_features=time_features,
-            node_out_features=12
+            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12
         )
     elif model == "seq2seq-gnn":
         num_nodes = dataset.num_nodes
@@ -53,24 +55,20 @@ def train_model(
             time_features=time_features,
             weather_features=weather_features,
         )
-        decoder = Decoder(
-            node_out_features=12,
-            num_nodes=num_nodes
-        )
+        decoder = Decoder(node_out_features=12, num_nodes=num_nodes)
         model = STGNNModel(encoder, decoder)
     elif model == "gatlstm":
         model = GATLSTM(
-            node_in_features=1,
-            weather_features=weather_features,
-            time_features=time_features,
-            node_out_features=12
+            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12
         )
     else:
         assert False, "Please provide a correct model name!"
 
     criterion = torch.nn.MSELoss()
     model.to(DEVICE)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    if lr_factor < 1:
+        scheduler = ReduceLROnPlateau(optimizer, "min", factor=lr_factor, patience=lr_patience)
     train_losses = []
     test_losses = []
 
@@ -88,6 +86,7 @@ def train_model(
         train_loss = 0
         num_batch_train = 0
         for batch in train_loader:
+            optimizer.zero_grad(set_to_none=True)
             out = model(batch.to(DEVICE))
 
             loss = criterion(batch.y, out.view(batch.num_graphs, -1))
@@ -96,13 +95,15 @@ def train_model(
 
             loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
 
         train_loss = train_loss / (num_batch_train)
         train_losses.append(np.sqrt(train_loss))
 
         test_loss = test_loss / (num_batch_test)
         test_losses.append(np.sqrt(test_loss))
+
+        if lr_factor < 1:
+            scheduler.step(test_loss)
 
         if EPOCH % 1 == 0:
 
@@ -119,11 +120,19 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     parser = argparse.ArgumentParser(description="Model training argument parser")
     parser.add_argument("-d", "--data", type=str, help="path to processed data")
-    parser.add_argument("-m", "--model", type=str, default="edgeconv", help="Use either [edgeconv, gatlstm, seq2seq-gnn")
+    parser.add_argument(
+        "-m", "--model", type=str, default="edgeconv", help="Use either [edgeconv, gatlstm, seq2seq-gnn"
+    )
     parser.add_argument("-n", "--num_history", type=int, default=8, help="number of history steps for predicting")
     parser.add_argument("-t", "--train_size", type=float, default=0.8, help="Ratio of data to be used for training")
     parser.add_argument("-b", "--batch_size", type=int, default=32, help="batchsize to be used")
     parser.add_argument("-e", "--epochs", type=int, default=200, help="number of epochs")
+    parser.add_argument("-wd", "--weight_decay", type=float, default=0.0, help="Amount of weight decay in optimizer")
+    parser.add_argument("-lr", "--learning_rate", type=float, default=0.001, help="learning rate")
+    parser.add_argument(
+        "-f", "--lr_factor", type=float, default=1, help="factor for reduing learning rate with lr scheduler"
+    )
+    parser.add_argument("-p", "--lr_patience", type=int, default=100, help="Patience for reducing lr")
 
     args = parser.parse_args()
     open_file = open(args.data, "rb")
@@ -137,7 +146,11 @@ if __name__ == "__main__":
         train_size=args.train_size,
         batch_size=args.batch_size,
         epochs=args.epochs,
-        model=args.model
+        model=args.model,
+        weight_decay=args.weight_decay,
+        learning_rate=args.learning_rate,
+        lr_factor=args.lr_factor,
+        lr_patience=args.lr_patience,
     )
     end_time = datetime.datetime.now()
     td = end_time - start_time
