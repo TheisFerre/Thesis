@@ -3,7 +3,7 @@ from torch.functional import einsum
 import torch.nn.functional as F
 from torch_geometric_temporal.signal import StaticGraphTemporalSignal
 from torch_geometric.nn import GCNConv, GraphConv, GATv2Conv, DynamicEdgeConv
-from torch_geometric.data import Data
+from torch_geometric.data import Data, Batch
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Dataset
 
@@ -503,6 +503,7 @@ class Edgeconvmodel(torch.nn.Module):
         self.node_out_features = node_out_features
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
+        self.cuda = cuda
         self.lin1 = torch.nn.Sequential(
             torch.nn.Linear((node_in_features + 2) * 2, (node_in_features + 2) * 4),
             torch.nn.ReLU(),
@@ -541,14 +542,18 @@ class Edgeconvmodel(torch.nn.Module):
         for i in range(num_hist):
             x = data.x[:, i, :]
             lat, lng = data.latitude[:, i, :], data.longitude[:, i, :]
-            lat = lat.reshape(-1, 1)
-            lng = lng.reshape(-1, 1)
-            x = x.reshape(-1, 1)
+            lat = lat.reshape(batch_size, nodes, 1)
+            lng = lng.reshape(batch_size, nodes, 1)
+            x = x.reshape(batch_size, nodes, 1)
             x = torch.cat([x, lat, lng], dim=-1)
+            data_list = [Data(x=x[i, :, :]) for i in range(batch_size)]
+            batched_data = Batch.from_data_list(data_list)
+            if self.cuda:
+                batched_data = batched_data.cuda()
 
-            x = self.edgeconv1(x)
-            x = self.edgeconv2(x)
-            x = self.edgeconv3(x)
+            x = self.edgeconv1(batched_data.x, batch=batched_data.batch)
+            x = self.edgeconv2(x, batch=batched_data.batch)
+            x = self.edgeconv3(x, batch=batched_data.batch)
 
             lstm_inputs[i, :, :] = x
 
