@@ -11,11 +11,10 @@
 #BSUB -e logs/%J_Error_nyc_combi.err Error log file
 echo "Starting:"
 
-#cd ~/Thesis/models
-cd /Users/theisferre/Documents/SPECIALE/Thesis/src/models
+cd ~/Thesis/models
+#cd /Users/theisferre/Documents/SPECIALE/Thesis/src/models
 
-#source ~/Thesis/venv-thesis/bin/activate
-#conda activate venv-thesis
+source ~/Thesis/venv-thesis/bin/activate
 
 DATA=../../data/processed/202106-citibike-tripdata.pkl
 MODEL=edgeconv
