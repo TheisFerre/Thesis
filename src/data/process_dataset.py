@@ -422,6 +422,7 @@ class Dataset:
 
 
 def temporal_signal_split(data_iterator, train_ratio: float = 0.8):
+    np.random.seed(42)
     train_snapshots = int(train_ratio * len(data_iterator))
     permutation = np.random.permutation(len(data_iterator))
     train_idx = permutation[0:train_snapshots]
