@@ -91,6 +91,7 @@ rsa==4.7.2
 s3transfer==0.5.0
 scikit-learn==0.24.2
 scipy==1.7.1
+seaborn==0.11.2
 Send2Trash==1.7.1
 six==1.16.0
 snowballstemmer==2.1.0
@@ -101,7 +102,7 @@ sphinxcontrib-htmlhelp==2.0.0
 sphinxcontrib-jsmath==1.0.1
 sphinxcontrib-qthelp==1.0.3
 sphinxcontrib-serializinghtml==1.1.5
--e git+https://github.com/TheisFerre/Thesis.git@2899c1156b516b023e9b06ad5c32be9fcf40d1b7#egg=src
+-e git+https://github.com/TheisFerre/Thesis.git@74a69b27785d4482a1e9f9b7b974349f490a18c5#egg=src
 terminado==0.10.1
 testpath==0.5.0
 threadpoolctl==2.2.0
