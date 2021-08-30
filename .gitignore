@@ -95,3 +95,5 @@ src/src
 
 models/*
 notebooks/*
+
+venv-thesis/*
