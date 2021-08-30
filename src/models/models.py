@@ -234,6 +234,7 @@ class GraphModel(torch.nn.Module):
         node_out_features: int = 8,
         hidden_size: int = 64,
         dropout_p: float = 0.3,
+        cuda: bool = False
     ):
         super(GraphModel, self).__init__()
         self.node_in_features = node_in_features
@@ -252,6 +253,8 @@ class GraphModel(torch.nn.Module):
     def forward(self, data: Data):
         batch_size, num_hist, nodes = data.x.shape
         lstm_inputs = torch.zeros((batch_size, num_hist, self.node_out_features * self.num_nodes))
+        if self.cuda:
+            lstm_inputs = lstm_inputs.cuda()
 
         for i in range(num_hist):
             x, edge_index, edge_weight = data.x[:, i, :], data.edge_index, data.edge_attr
@@ -283,6 +286,7 @@ class Encoder(torch.nn.Module):
         weather_features: int,
         node_out_features: int = 8,
         hidden_size: int = 64,
+        cuda: bool = False
     ):
         super(Encoder, self).__init__()
         self.node_in_features = node_in_features
@@ -318,6 +322,7 @@ class Encoder(torch.nn.Module):
             num_nodes=self.num_nodes,
             node_out_features=self.node_out_features,
             hidden_size=self.hidden_size,
+            cuda=self.cuda
         )
 
         self.weather_model = ExternalLSTM(
@@ -356,7 +361,6 @@ class Encoder(torch.nn.Module):
         return cell_state_fused, hiden_state_fused
 
 
-# TODO: IMPLEMENT DECODER LSTM
 class Decoder(torch.nn.Module):
     def __init__(self, node_out_features, num_nodes):
         super(Decoder, self).__init__()
@@ -417,6 +421,7 @@ class GATLSTM(torch.nn.Module):
         node_out_features: int = 8,
         hidden_size: int = 64,
         dropout_p: float = 0.3,
+        cuda: bool = False
     ):
         super(GATLSTM, self).__init__()
         self.node_in_features = node_in_features
@@ -425,6 +430,7 @@ class GATLSTM(torch.nn.Module):
         self.node_out_features = node_out_features
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
+        self.cuda = cuda
         self.conv1_sh = GATv2Conv(node_in_features, node_out_features)
         self.conv2_sh = GATv2Conv(node_out_features, node_out_features)
         self.lstm = torch.nn.LSTM(
@@ -437,7 +443,10 @@ class GATLSTM(torch.nn.Module):
     def forward(self, data: Data):
         batch_size, num_hist, nodes = data.x.shape
         # SHAPE (SEQ LENGTH, BATCHSIZE X NUM_NODES, NODE_OUT_FEATURES)
+        
         lstm_inputs = torch.zeros((num_hist, batch_size * nodes, self.node_out_features))
+        if self.cuda:
+            lstm_inputs = lstm_inputs.cuda()
 
         for i in range(num_hist):
             x, edge_index, edge_weight = data.x[:, i, :], data.edge_index, data.edge_attr
@@ -458,6 +467,8 @@ class GATLSTM(torch.nn.Module):
         weather_repeated = data.weather[:, -1, :].repeat(nodes, 1)
         time_repeated = data.time_encoding[:, -1, :].repeat(nodes, 1)
         out_embedded = torch.cat([out, weather_repeated, time_repeated], dim=1)
+        if self.cuda:
+            out_embedded = out_embedded.cuda()
 
         prediction = self.linear(out_embedded)
 
@@ -483,6 +494,7 @@ class Edgeconvmodel(torch.nn.Module):
         node_out_features: int = 8,
         hidden_size: int = 64,
         dropout_p: float = 0.3,
+        cuda: bool = False
     ):
         super(Edgeconvmodel, self).__init__()
         self.node_in_features = node_in_features
@@ -523,7 +535,7 @@ class Edgeconvmodel(torch.nn.Module):
         batch_size, num_hist, nodes = data.x.shape
         # SHAPE (SEQ LENGTH, BATCHSIZE X NUM_NODES, NODE_OUT_FEATURES)
         lstm_inputs = torch.zeros((num_hist, batch_size * nodes, self.node_out_features))
-        if next(self.parameters()).device.type == "cuda":
+        if self.cuda:
             lstm_inputs = lstm_inputs.cuda()
 
         for i in range(num_hist):
@@ -546,6 +558,9 @@ class Edgeconvmodel(torch.nn.Module):
         weather_repeated = data.weather[:, -1, :].repeat(nodes, 1)
         time_repeated = data.time_encoding[:, -1, :].repeat(nodes, 1)
         out_embedded = torch.cat([out, weather_repeated, time_repeated], dim=1)
+
+        if self.cuda:
+            out_embedded = out_embedded.cuda()
 
         prediction = self.linear(out_embedded)
 

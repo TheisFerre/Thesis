@@ -10,6 +10,7 @@ import datetime
 import logging
 import os
 import json
+from distutils.dir_util import copy_tree
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -25,6 +26,7 @@ def train_model(
     learning_rate: float = 0.001,
     lr_factor: float = 1.0,
     lr_patience: int = 100,
+    cuda: bool = False
 ):
 
     train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=8, ratio=train_size)
@@ -44,7 +46,7 @@ def train_model(
 
     if model == "edgeconv":
         model = Edgeconvmodel(
-            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12
+            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12, cuda=cuda
         )
     elif model == "seq2seq-gnn":
         num_nodes = dataset.num_nodes
@@ -54,12 +56,13 @@ def train_model(
             node_out_features=12,
             time_features=time_features,
             weather_features=weather_features,
+            cuda=cuda
         )
         decoder = Decoder(node_out_features=12, num_nodes=num_nodes)
         model = STGNNModel(encoder, decoder)
     elif model == "gatlstm":
         model = GATLSTM(
-            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12
+            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12, cuda=cuda
         )
     else:
         assert False, "Please provide a correct model name!"
@@ -107,10 +110,10 @@ def train_model(
 
         if EPOCH % 1 == 0:
 
-            print(f"Epoch number {EPOCH+1}")
-            print(f"Epoch avg RMSE loss (TRAIN): {train_losses[-1]}")
-            print(f"Epoch avg RMSE loss (TEST): {test_losses[-1]}")
-            print("-" * 10)
+            logger.info(f"Epoch number {EPOCH+1}")
+            logger.info(f"Epoch avg RMSE loss (TRAIN): {train_losses[-1]}")
+            logger.info(f"Epoch avg RMSE loss (TEST): {test_losses[-1]}")
+            logger.info("-" * 10)
 
     return model, train_losses, test_losses
 
@@ -133,6 +136,7 @@ if __name__ == "__main__":
         "-f", "--lr_factor", type=float, default=1, help="factor for reduing learning rate with lr scheduler"
     )
     parser.add_argument("-p", "--lr_patience", type=int, default=100, help="Patience for reducing lr")
+    parser.add_argument("-c", "--cuda", action='store_true')
 
     args = parser.parse_args()
     open_file = open(args.data, "rb")
@@ -151,6 +155,7 @@ if __name__ == "__main__":
         learning_rate=args.learning_rate,
         lr_factor=args.lr_factor,
         lr_patience=args.lr_patience,
+        cuda=args.cuda
     )
     end_time = datetime.datetime.now()
     td = end_time - start_time
@@ -175,19 +180,32 @@ if __name__ == "__main__":
     os.chdir("models")
     cur_dir = os.getcwd()
 
-    logger.info(f"Saving files to {cur_dir}/run_{str(end_time)}")
-    os.mkdir(f"run_{str(end_time)}")
+    logger.info(f"Saving files to {cur_dir}/{args.model}_{str(end_time)}")
+    os.mkdir(f"{args.model}_{str(end_time)}")
 
     args_dict = vars(args)
-    with open(f"run_{str(end_time)}/settings.json", "w") as outfile:
+    with open(f"{args.model}_{str(end_time)}/settings.json", "w") as outfile:
         json.dump(args_dict, outfile)
 
     losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
-    outfile = open(f"run_{str(end_time)}/losses.pkl", "wb")
+    outfile = open(f"{args.model}_{str(end_time)}/losses.pkl", "wb")
     dill.dump(losses_dict, outfile)
     outfile.close()
 
     model.to("cpu")
-    torch.save(model.state_dict(), f"run_{str(end_time)}/model.pth")
+    torch.save(model.state_dict(), f"{args.model}_{str(end_time)}/model.pth")
 
     logger.info("Files saved successfully")
+
+    os.chdir(f"{args.model}_{str(end_time)}")
+    os.mkdir(f"logs")
+
+    target_dir = "logs"
+    source_dir = f"{os.getenv('HOME')}/.lsbatch"
+
+    copy_tree(source_dir, target_dir)
+    
+    for f in os.listdir(target_dir):
+        if not f.endswith("err") and not f.endswith("out"):
+            os.remove(f"{target_dir}/{f}")
+    

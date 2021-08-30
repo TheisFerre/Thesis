@@ -93,7 +93,8 @@ target/
 
 src/src
 
-models/*
+models/run*
 notebooks/*
 
 venv-thesis/*
+train_scripts/logs
