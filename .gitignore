@@ -94,6 +94,9 @@ target/
 src/src
 
 models/run*
+models/seq2seq*
+models/gatlstm*
+models/edgeconv*
 notebooks/*
 
 venv-thesis/*

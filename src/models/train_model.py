@@ -108,7 +108,7 @@ def train_model(
         if lr_factor < 1:
             scheduler.step(test_loss)
 
-        if EPOCH % 1 == 0:
+        if EPOCH % 25 == 0:
 
             logger.info(f"Epoch number {EPOCH+1}")
             logger.info(f"Epoch avg RMSE loss (TRAIN): {train_losses[-1]}")
