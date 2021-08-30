@@ -1,4 +1,4 @@
-from src.models.models import Edgeconvmodel
+from src.models.models import Edgeconvmodel, GATLSTM, Encoder, Decoder, STGNNModel
 import torch
 import numpy as np
 import dill
@@ -14,7 +14,12 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def train_model(
-    dataset: Dataset, num_history: int = 8, train_size: float = 0.8, batch_size: int = 32, epochs: int = 200
+    dataset: Dataset,
+    num_history: int = 8,
+    train_size: float = 0.8,
+    batch_size: int = 32,
+    epochs: int = 200,
+    model: str = "edgeconv",
 ):
 
     train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=8, ratio=train_size)
@@ -31,9 +36,37 @@ def train_model(
 
     weather_features = train_dataset.weather_information.shape[-1]
     time_features = train_dataset.time_encoding.shape[-1]
-    model = Edgeconvmodel(
-        node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12
-    )
+
+    if model == "edgeconv":
+        model = Edgeconvmodel(
+            node_in_features=1,
+            weather_features=weather_features,
+            time_features=time_features,
+            node_out_features=12
+        )
+    elif model == "seq2seq-gnn":
+        num_nodes = dataset.num_nodes
+        encoder = Encoder(
+            node_in_features=1,
+            num_nodes=num_nodes,
+            node_out_features=12,
+            time_features=time_features,
+            weather_features=weather_features,
+        )
+        decoder = Decoder(
+            node_out_features=12,
+            num_nodes=num_nodes
+        )
+        model = STGNNModel(encoder, decoder)
+    elif model == "gatlstm":
+        model = GATLSTM(
+            node_in_features=1,
+            weather_features=weather_features,
+            time_features=time_features,
+            node_out_features=12
+        )
+    else:
+        assert False, "Please provide a correct model name!"
 
     criterion = torch.nn.MSELoss()
     model.to(DEVICE)
@@ -82,9 +115,11 @@ def train_model(
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     parser = argparse.ArgumentParser(description="Model training argument parser")
     parser.add_argument("-d", "--data", type=str, help="path to processed data")
+    parser.add_argument("-m", "--model", type=str, default="edgeconv", help="Use either [edgeconv, gatlstm, seq2seq-gnn")
     parser.add_argument("-n", "--num_history", type=int, default=8, help="number of history steps for predicting")
     parser.add_argument("-t", "--train_size", type=float, default=0.8, help="Ratio of data to be used for training")
     parser.add_argument("-b", "--batch_size", type=int, default=32, help="batchsize to be used")
@@ -101,11 +136,18 @@ if __name__ == "__main__":
         num_history=args.num_history,
         train_size=args.train_size,
         batch_size=args.batch_size,
-        epochs=args.epochs
+        epochs=args.epochs,
+        model=args.model
     )
     end_time = datetime.datetime.now()
-    td = start_time - end_time
-    logger.info(f"Model fitted after: {str(td)}")
+    td = end_time - start_time
+    minutes = round(td.total_seconds() / 60, 2)
+    totsec = td.total_seconds()
+    h = int(totsec // 3600)
+    m = int((totsec % 3600) // 60)
+    sec = int((totsec % 3600) % 60)
+    logger.info(f"Total training time: {h}:{m}:{sec}")
+    logger.info(f"Average Epoch time: {round(minutes/args.epochs, 2)} minutes")
     cur_dir = os.getcwd()
     while True:
         split_dir = cur_dir.split("/")

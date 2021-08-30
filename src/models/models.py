@@ -397,10 +397,10 @@ class STGNNModel(torch.nn.Module):
             cell_state_fused.unsqueeze(0),
         )
 
-        return out, (hidden_state, cell_state)
+        return out
 
 
-class GraphModel(torch.nn.Module):
+class GATLSTM(torch.nn.Module):
     """
     This model is using a stand GNN layer to embed nodes
     It computes features for each node in the graph over q time steps.
@@ -408,6 +408,7 @@ class GraphModel(torch.nn.Module):
     the last output of the LSTM model is then fed into a linear layer
     that also takes into account the weather and time features
     """
+
     def __init__(
         self,
         node_in_features: int,
@@ -417,7 +418,7 @@ class GraphModel(torch.nn.Module):
         hidden_size: int = 64,
         dropout_p: float = 0.3,
     ):
-        super(GraphModel, self).__init__()
+        super(GATLSTM, self).__init__()
         self.node_in_features = node_in_features
         self.weather_features = weather_features
         self.time_features = time_features
@@ -442,29 +443,27 @@ class GraphModel(torch.nn.Module):
             x, edge_index, edge_weight = data.x[:, i, :], data.edge_index, data.edge_attr
             x = x.reshape(-1, 1)
 
-            x = self.conv1_sh(x=x, edge_index=edge_index)#, edge_weight=edge_weight)
+            x = self.conv1_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
             x = F.relu(x)
             x = F.dropout(x, self.dropout_p, training=self.training)
-            x = self.conv2_sh(x=x, edge_index=edge_index)#, edge_weight=edge_weight)
+            x = self.conv2_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
             x = F.relu(x)
             x = F.dropout(x, p=self.dropout_p, training=self.training)
-            
 
             lstm_inputs[i, :, :] = x
-        
+
         # only take last output
         out, _ = self.lstm(lstm_inputs)
         out = out[-1]
         weather_repeated = data.weather[:, -1, :].repeat(nodes, 1)
         time_repeated = data.time_encoding[:, -1, :].repeat(nodes, 1)
         out_embedded = torch.cat([out, weather_repeated, time_repeated], dim=1)
-        
+
         prediction = self.linear(out_embedded)
 
         prediction = prediction.reshape(batch_size, nodes, 1)
 
         return prediction
-
 
 
 class Edgeconvmodel(torch.nn.Module):
@@ -475,6 +474,7 @@ class Edgeconvmodel(torch.nn.Module):
     the last output of the LSTM model is then fed into a linear layer
     that also takes into account the weather and time features
     """
+
     def __init__(
         self,
         node_in_features: int,
