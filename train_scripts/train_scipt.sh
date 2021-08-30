@@ -7,8 +7,8 @@ BSUB -R "span[hosts=1]" #How many nodes the job requests
 BSUB -R "rusage[mem=40GB]" #How much RAM the job should have access to
 BSUB -R "select[gpu32gb]" #For requesting the extra big GPU w. 32GB of VRAM
 BSUB -N #Send an email when done
-BSUB -o logs/%J_Output_nyc_combi.out #Log file
-BSUB -e logs/%J_Error_nyc_combi.err #Error log file
+BSUB -o logs/%J_OUTPUT.out #Log file
+BSUB -e logs/%J_ERROR.err #Error log file
 echo "Starting:"
 
 cd ~/Thesis/src/models
