@@ -26,7 +26,7 @@ def train_model(
     learning_rate: float = 0.001,
     lr_factor: float = 1.0,
     lr_patience: int = 100,
-    cuda: bool = False
+    gpu: bool = False
 ):
 
     train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=8, ratio=train_size)
@@ -46,7 +46,7 @@ def train_model(
 
     if model == "edgeconv":
         model = Edgeconvmodel(
-            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12, cuda=cuda
+            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12, gpu=gpu
         )
     elif model == "seq2seq-gnn":
         num_nodes = dataset.num_nodes
@@ -56,13 +56,13 @@ def train_model(
             node_out_features=12,
             time_features=time_features,
             weather_features=weather_features,
-            cuda=cuda
+            gpu=gpu
         )
         decoder = Decoder(node_out_features=12, num_nodes=num_nodes)
         model = STGNNModel(encoder, decoder)
     elif model == "gatlstm":
         model = GATLSTM(
-            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12, cuda=cuda
+            node_in_features=1, weather_features=weather_features, time_features=time_features, node_out_features=12, gpu=gpu
         )
     else:
         assert False, "Please provide a correct model name!"
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         "-f", "--lr_factor", type=float, default=1, help="factor for reduing learning rate with lr scheduler"
     )
     parser.add_argument("-p", "--lr_patience", type=int, default=100, help="Patience for reducing lr")
-    parser.add_argument("-c", "--cuda", action='store_true')
+    parser.add_argument("-g", "--gpu", action='store_true')
 
     args = parser.parse_args()
     open_file = open(args.data, "rb")
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         learning_rate=args.learning_rate,
         lr_factor=args.lr_factor,
         lr_patience=args.lr_patience,
-        cuda=args.cuda
+        gpu=args.gpu
     )
     end_time = datetime.datetime.now()
     td = end_time - start_time

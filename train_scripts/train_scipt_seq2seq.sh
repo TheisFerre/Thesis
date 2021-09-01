@@ -16,7 +16,7 @@ cd ~/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=../../data/processed/citibike-tripdata.pkl
+DATA=../../data/processed/citibike2014-tripdata.pkl
 MODEL=seq2seq-gnn
 NUM_HISTORY=12
 TRAIN_SIZE=0.8
@@ -28,8 +28,7 @@ LR_FACTOR=0.1
 LR_PATIENCE=25
 
 
-
 python train_model.py --data $DATA --model $MODEL --num_history $NUM_HISTORY --train_size $TRAIN_SIZE \
 --batch_size $BATCH_SIZE --epochs $EPOCHS --weight_decay $WEIGHT_DECAY --learning_rate $LEARNING_RATE \
---lr_factor $LR_FACTOR --lr_patience $LR_PATIENCE 
+--lr_factor $LR_FACTOR --lr_patience $LR_PATIENCE --gpu
 
