@@ -158,6 +158,7 @@ if __name__ == "__main__":
         gpu=args.gpu
     )
     end_time = datetime.datetime.now()
+    end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
     td = end_time - start_time
     minutes = round(td.total_seconds() / 60, 2)
     totsec = td.total_seconds()
@@ -180,24 +181,24 @@ if __name__ == "__main__":
     os.chdir("models")
     cur_dir = os.getcwd()
 
-    logger.info(f"Saving files to {cur_dir}/{args.model}_{str(end_time)}")
-    os.mkdir(f"{args.model}_{str(end_time)}")
+    logger.info(f"Saving files to {cur_dir}/{args.model}_{end_time_str}")
+    os.mkdir(f"{args.model}_{end_time_str}")
 
     args_dict = vars(args)
-    with open(f"{args.model}_{str(end_time)}/settings.json", "w") as outfile:
+    with open(f"{args.model}_{end_time_str}/settings.json", "w") as outfile:
         json.dump(args_dict, outfile)
 
     losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
-    outfile = open(f"{args.model}_{str(end_time)}/losses.pkl", "wb")
+    outfile = open(f"{args.model}_{end_time_str}/losses.pkl", "wb")
     dill.dump(losses_dict, outfile)
     outfile.close()
 
     model.to("cpu")
-    torch.save(model.state_dict(), f"{args.model}_{str(end_time)}/model.pth")
+    torch.save(model.state_dict(), f"{args.model}_{end_time_str}/model.pth")
 
     logger.info("Files saved successfully")
 
-    os.chdir(f"{args.model}_{str(end_time)}")
+    os.chdir(f"{args.model}_{end_time_str}")
     os.mkdir(f"logs")
 
     target_dir = "logs"
