@@ -6,7 +6,6 @@
 #BSUB -R "span[hosts=1]" #How many nodes the job requests
 #BSUB -R "rusage[mem=40GB]" #How much RAM the job should have access to
 #BSUB -R "select[gpu32gb]" #For requesting the extra big GPU w. 32GB of VRAM
-#BSUB -N #Send an email when done
 #BSUB -o logs/OUTPUT.%J #Log file
 #BSUB -e logs/ERROR.%J #Error log file
 echo "Starting:"
