@@ -496,7 +496,8 @@ class Edgeconvmodel(torch.nn.Module):
         node_out_features: int = 8,
         hidden_size: int = 32,
         dropout_p: float = 0.5,
-        gpu: bool = False
+        gpu: bool = False,
+        k: int = 20
     ):
         super(Edgeconvmodel, self).__init__()
         self.node_in_features = node_in_features
@@ -506,20 +507,21 @@ class Edgeconvmodel(torch.nn.Module):
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
         self.gpu = gpu
+        self.k = k
         self.lin1 = torch.nn.Sequential(
             torch.nn.Linear((node_in_features + 2) * 2, (node_in_features + 2) * 4),
             torch.nn.LeakyReLU(),
             torch.nn.Linear((node_in_features + 2) * 4, 32),
         )
-        self.edgeconv1 = DynamicEdgeConv(nn=self.lin1, k=20)
+        self.edgeconv1 = DynamicEdgeConv(nn=self.lin1, k=self.k)
 
         self.lin2 = torch.nn.Sequential(
             torch.nn.Linear(64, 64),
-             torch.nn.Dropout(self.dropout_p),
-              torch.nn.LeakyReLU(),
-               torch.nn.Linear(64, node_out_features)
+            torch.nn.Dropout(self.dropout_p),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, node_out_features)
         )
-        self.edgeconv2 = DynamicEdgeConv(nn=self.lin2, k=20)
+        self.edgeconv2 = DynamicEdgeConv(nn=self.lin2, k=self.k)
 
         self.lin3 = torch.nn.Sequential(
             torch.nn.Linear(32 * 2, 32),
@@ -527,7 +529,7 @@ class Edgeconvmodel(torch.nn.Module):
             torch.nn.LeakyReLU(),
             torch.nn.Linear(32, node_out_features),
         )
-        self.edgeconv3 = DynamicEdgeConv(nn=self.lin3, k=20)
+        self.edgeconv3 = DynamicEdgeConv(nn=self.lin3, k=self.k)
 
         self.lstm = torch.nn.LSTM(
             input_size=node_out_features,
@@ -558,7 +560,7 @@ class Edgeconvmodel(torch.nn.Module):
 
             x = self.edgeconv1(batched_data.x, batch=batched_data.batch)
             x = self.edgeconv2(x, batch=batched_data.batch)
-            #x = self.edgeconv3(x, batch=batched_data.batch)
+            x = self.edgeconv3(x, batch=batched_data.batch)
 
             lstm_inputs[i, :, :] = x
 

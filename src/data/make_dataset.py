@@ -62,12 +62,7 @@ def main(input_filepath, output_filepath):
 
             # THIS ORDERING HAS TO BE THE EXACT SAME ALL THE TIME!!!
             region_ordering = df["grid_id"].unique()
-            # ADD NODES THAT DONT EXIST (GRID REGIONS WHERE NO OBSERVATIONS OCCUR)
-            """for i in range(10):
-                for j in range(10):
-                    grid_id = f"{i}{j}"
-                    if not f"{i}{j}" in region_ordering:
-                        region_ordering = np.append(region_ordering, grid_id)"""
+            
             
             if file_dict["GRAPH"] == "CORR":
                 # CORRELATION ADJ MATRIX
@@ -77,6 +72,12 @@ def main(input_filepath, output_filepath):
             elif file_dict["GRAPH"] == "GRID":
                 # NEIGHBOURHOOD ADJ MATRIX
                 adj_mat = neighbourhood_adjacency_matrix(region_ordering=region_ordering)
+                # ADD NODES THAT DONT EXIST (GRID REGIONS WHERE NO OBSERVATIONS OCCUR)
+                """for i in range(10):
+                    for j in range(10):
+                        grid_id = f"{i}{j}"
+                        if not f"{i}{j}" in region_ordering:
+                            region_ordering = np.append(region_ordering, grid_id)"""
             else:
                 adj_mat = np.eye(len(region_ordering))
 
