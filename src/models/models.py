@@ -249,6 +249,7 @@ class GraphModel(torch.nn.Module):
             hidden_size=self.num_nodes * self.node_out_features,
             batch_first=True,
         )
+        self.cuda = cuda
 
     def forward(self, data: Data):
         batch_size, num_hist, nodes = data.x.shape
@@ -295,6 +296,7 @@ class Encoder(torch.nn.Module):
         self.weather_features = weather_features
         self.node_out_features = node_out_features
         self.hidden_size = hidden_size
+        self.cuda = cuda
 
         self.weight_graph_cell_state = torch.nn.Parameter(
             torch.nn.init.normal_(torch.zeros(self.num_nodes * self.node_out_features)), requires_grad=True
