@@ -15,20 +15,25 @@ cd ~/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=../../data/processed/citibike2014-tripdata.pkl
+DATA=../../data/processed/citibike-tripdata.pkl
 MODEL=edgeconv
 NUM_HISTORY=12
 TRAIN_SIZE=0.8
 BATCH_SIZE=64
-EPOCHS=500
-WEIGHT_DECAY=0.0005
+EPOCHS=250
+WEIGHT_DECAY=0.00001
 LEARNING_RATE=0.001
 LR_FACTOR=0.1
-LR_PATIENCE=25
+LR_PATIENCE=50
+OPTIMIZER=RMSprop
+NODE_OUT_FEATURES=10
+HIDDEN_SIZE=46
+DROPOUT_P=0.2
 
 
 
 python train_model.py --data $DATA --model $MODEL --num_history $NUM_HISTORY --train_size $TRAIN_SIZE \
 --batch_size $BATCH_SIZE --epochs $EPOCHS --weight_decay $WEIGHT_DECAY --learning_rate $LEARNING_RATE \
---lr_factor $LR_FACTOR --lr_patience $LR_PATIENCE --gpu
+--lr_factor $LR_FACTOR --lr_patience $LR_PATIENCE --optimizer $OPTIMIZER --hidden_size $HIDDEN_SIZE \
+--node_out_feature $NODE_OUT_FEATURES --dropout $DROPOUT_P --gpu
 

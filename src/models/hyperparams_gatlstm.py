@@ -48,18 +48,16 @@ def objective(trial):
     node_out_features = trial.suggest_int("node_out_features", 6, 32)
     hidden_size = trial.suggest_int("hidden_size", 12, 64)
     dropout_p = trial.suggest_float("dropout_p", 0.2, 0.6)
-    k = trial.suggest_int("K", 5, 30)
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 0.5, log=True)
     learning_rate = trial.suggest_float("lr", 1e-6, 1e-2, log=True)
 
-    model = Edgeconvmodel(
+    model = GATLSTM(
         node_in_features=1,
         weather_features=weather_features,
         time_features=time_features,
         node_out_features=node_out_features,
         hidden_size=hidden_size,
         dropout_p=dropout_p,
-        k=k,
         gpu=True
     )
 
@@ -166,15 +164,15 @@ if __name__ == "__main__":
                 cur_dir = os.getcwd()
     os.chdir("models")
     cur_dir = os.getcwd()
-    logger.info(f"Saving files to {cur_dir}/edgeconv_hyperopt_{end_time_str}")
-    os.mkdir(f"edgeconv_hyperopt_{end_time_str}")
+    logger.info(f"Saving files to {cur_dir}/gatlstm_hyperopt_{end_time_str}")
+    os.mkdir(f"gatlstm_hyperopt_{end_time_str}")
 
     trial_df = study.trials_dataframe()
-    trial_df.to_csv(f"edgeconv_hyperopt_{end_time_str}/trials.csv", index=False)
+    trial_df.to_csv(f"gatlstm_hyperopt_{end_time_str}/trials.csv", index=False)
 
     logger.info("Files saved successfully")
 
-    os.chdir(f"edgeconv_hyperopt_{end_time_str}")
+    os.chdir(f"gatlstm_hyperopt_{end_time_str}")
     os.mkdir(f"logs")
 
     target_dir = "logs"

@@ -433,8 +433,9 @@ class GATLSTM(torch.nn.Module):
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
         self.gpu = gpu
-        self.conv1_sh = GATv2Conv(node_in_features, node_out_features)
-        self.conv2_sh = GATv2Conv(node_out_features, node_out_features)
+        self.conv1_sh = GATv2Conv(node_in_features, 16)
+        self.conv2_sh = GATv2Conv(16, 32)
+        self.conv3_sh = GATv2Conv(32, node_out_features)
         self.lstm = torch.nn.LSTM(
             input_size=node_out_features,
             hidden_size=self.hidden_size,
@@ -458,6 +459,9 @@ class GATLSTM(torch.nn.Module):
             x = F.relu(x)
             x = F.dropout(x, self.dropout_p, training=self.training)
             x = self.conv2_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout_p, training=self.training)
+            x = self.conv3_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
             x = F.relu(x)
             x = F.dropout(x, p=self.dropout_p, training=self.training)
 
@@ -519,12 +523,12 @@ class Edgeconvmodel(torch.nn.Module):
             torch.nn.Linear(64, 64),
             torch.nn.Dropout(self.dropout_p),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(64, node_out_features)
+            torch.nn.Linear(64, 64)
         )
         self.edgeconv2 = DynamicEdgeConv(nn=self.lin2, k=self.k)
 
         self.lin3 = torch.nn.Sequential(
-            torch.nn.Linear(32 * 2, 32),
+            torch.nn.Linear(64 * 2, 32),
             torch.nn.Dropout(self.dropout_p),
             torch.nn.LeakyReLU(),
             torch.nn.Linear(32, node_out_features),
