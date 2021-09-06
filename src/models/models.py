@@ -3,7 +3,7 @@ from torch.functional import einsum
 import torch.nn.functional as F
 from torch_geometric_temporal.signal import StaticGraphTemporalSignal
 from torch_geometric.nn import GCNConv, GraphConv, GATv2Conv, DynamicEdgeConv
-from torch_geometric.data import Data
+from torch_geometric.data import Data, Batch
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Dataset
 
@@ -234,6 +234,7 @@ class GraphModel(torch.nn.Module):
         node_out_features: int = 8,
         hidden_size: int = 64,
         dropout_p: float = 0.3,
+        gpu: bool = False
     ):
         super(GraphModel, self).__init__()
         self.node_in_features = node_in_features
@@ -248,10 +249,13 @@ class GraphModel(torch.nn.Module):
             hidden_size=self.num_nodes * self.node_out_features,
             batch_first=True,
         )
+        self.gpu = gpu
 
     def forward(self, data: Data):
         batch_size, num_hist, nodes = data.x.shape
         lstm_inputs = torch.zeros((batch_size, num_hist, self.node_out_features * self.num_nodes))
+        if self.gpu:
+            lstm_inputs = lstm_inputs.cuda()
 
         for i in range(num_hist):
             x, edge_index, edge_weight = data.x[:, i, :], data.edge_index, data.edge_attr
@@ -283,6 +287,7 @@ class Encoder(torch.nn.Module):
         weather_features: int,
         node_out_features: int = 8,
         hidden_size: int = 64,
+        gpu: bool = False
     ):
         super(Encoder, self).__init__()
         self.node_in_features = node_in_features
@@ -291,6 +296,7 @@ class Encoder(torch.nn.Module):
         self.weather_features = weather_features
         self.node_out_features = node_out_features
         self.hidden_size = hidden_size
+        self.gpu = gpu
 
         self.weight_graph_cell_state = torch.nn.Parameter(
             torch.nn.init.normal_(torch.zeros(self.num_nodes * self.node_out_features)), requires_grad=True
@@ -318,6 +324,7 @@ class Encoder(torch.nn.Module):
             num_nodes=self.num_nodes,
             node_out_features=self.node_out_features,
             hidden_size=self.hidden_size,
+            gpu=self.gpu
         )
 
         self.weather_model = ExternalLSTM(
@@ -356,7 +363,6 @@ class Encoder(torch.nn.Module):
         return cell_state_fused, hiden_state_fused
 
 
-# TODO: IMPLEMENT DECODER LSTM
 class Decoder(torch.nn.Module):
     def __init__(self, node_out_features, num_nodes):
         super(Decoder, self).__init__()
@@ -417,6 +423,7 @@ class GATLSTM(torch.nn.Module):
         node_out_features: int = 8,
         hidden_size: int = 64,
         dropout_p: float = 0.3,
+        gpu: bool = False
     ):
         super(GATLSTM, self).__init__()
         self.node_in_features = node_in_features
@@ -425,8 +432,10 @@ class GATLSTM(torch.nn.Module):
         self.node_out_features = node_out_features
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
-        self.conv1_sh = GATv2Conv(node_in_features, node_out_features)
-        self.conv2_sh = GATv2Conv(node_out_features, node_out_features)
+        self.gpu = gpu
+        self.conv1_sh = GATv2Conv(node_in_features, 16)
+        self.conv2_sh = GATv2Conv(16, 32)
+        self.conv3_sh = GATv2Conv(32, node_out_features)
         self.lstm = torch.nn.LSTM(
             input_size=node_out_features,
             hidden_size=self.hidden_size,
@@ -437,7 +446,10 @@ class GATLSTM(torch.nn.Module):
     def forward(self, data: Data):
         batch_size, num_hist, nodes = data.x.shape
         # SHAPE (SEQ LENGTH, BATCHSIZE X NUM_NODES, NODE_OUT_FEATURES)
+        
         lstm_inputs = torch.zeros((num_hist, batch_size * nodes, self.node_out_features))
+        if self.gpu:
+            lstm_inputs = lstm_inputs.cuda()
 
         for i in range(num_hist):
             x, edge_index, edge_weight = data.x[:, i, :], data.edge_index, data.edge_attr
@@ -449,6 +461,9 @@ class GATLSTM(torch.nn.Module):
             x = self.conv2_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
             x = F.relu(x)
             x = F.dropout(x, p=self.dropout_p, training=self.training)
+            x = self.conv3_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout_p, training=self.training)
 
             lstm_inputs[i, :, :] = x
 
@@ -458,6 +473,8 @@ class GATLSTM(torch.nn.Module):
         weather_repeated = data.weather[:, -1, :].repeat(nodes, 1)
         time_repeated = data.time_encoding[:, -1, :].repeat(nodes, 1)
         out_embedded = torch.cat([out, weather_repeated, time_repeated], dim=1)
+        if self.gpu:
+            out_embedded = out_embedded.cuda()
 
         prediction = self.linear(out_embedded)
 
@@ -481,8 +498,10 @@ class Edgeconvmodel(torch.nn.Module):
         weather_features: int,
         time_features: int,
         node_out_features: int = 8,
-        hidden_size: int = 64,
-        dropout_p: float = 0.3,
+        hidden_size: int = 32,
+        dropout_p: float = 0.5,
+        gpu: bool = False,
+        k: int = 20
     ):
         super(Edgeconvmodel, self).__init__()
         self.node_in_features = node_in_features
@@ -491,25 +510,30 @@ class Edgeconvmodel(torch.nn.Module):
         self.node_out_features = node_out_features
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
+        self.gpu = gpu
+        self.k = k
         self.lin1 = torch.nn.Sequential(
             torch.nn.Linear((node_in_features + 2) * 2, (node_in_features + 2) * 4),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
             torch.nn.Linear((node_in_features + 2) * 4, 32),
         )
-        self.edgeconv1 = DynamicEdgeConv(nn=self.lin1, k=15)
+        self.edgeconv1 = DynamicEdgeConv(nn=self.lin1, k=self.k)
 
         self.lin2 = torch.nn.Sequential(
-            torch.nn.Linear(64, 64), torch.nn.Dropout(self.dropout_p), torch.nn.ReLU(), torch.nn.Linear(64, 32)
+            torch.nn.Linear(64, 64),
+            torch.nn.Dropout(self.dropout_p),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 64)
         )
-        self.edgeconv2 = DynamicEdgeConv(nn=self.lin2, k=15)
+        self.edgeconv2 = DynamicEdgeConv(nn=self.lin2, k=self.k)
 
         self.lin3 = torch.nn.Sequential(
-            torch.nn.Linear(32 * 2, 32),
+            torch.nn.Linear(64 * 2, 32),
             torch.nn.Dropout(self.dropout_p),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
             torch.nn.Linear(32, node_out_features),
         )
-        self.edgeconv3 = DynamicEdgeConv(nn=self.lin3, k=15)
+        self.edgeconv3 = DynamicEdgeConv(nn=self.lin3, k=self.k)
 
         self.lstm = torch.nn.LSTM(
             input_size=node_out_features,
@@ -523,20 +547,24 @@ class Edgeconvmodel(torch.nn.Module):
         batch_size, num_hist, nodes = data.x.shape
         # SHAPE (SEQ LENGTH, BATCHSIZE X NUM_NODES, NODE_OUT_FEATURES)
         lstm_inputs = torch.zeros((num_hist, batch_size * nodes, self.node_out_features))
-        if next(self.parameters()).device.type == "cuda":
+        if self.gpu:
             lstm_inputs = lstm_inputs.cuda()
 
         for i in range(num_hist):
             x = data.x[:, i, :]
             lat, lng = data.latitude[:, i, :], data.longitude[:, i, :]
-            lat = lat.reshape(-1, 1)
-            lng = lng.reshape(-1, 1)
-            x = x.reshape(-1, 1)
+            lat = lat.reshape(batch_size, nodes, 1)
+            lng = lng.reshape(batch_size, nodes, 1)
+            x = x.reshape(batch_size, nodes, 1)
             x = torch.cat([x, lat, lng], dim=-1)
+            data_list = [Data(x=x[i, :, :]) for i in range(batch_size)]
+            batched_data = Batch.from_data_list(data_list)
+            if self.gpu:
+                batched_data = batched_data.cuda()
 
-            x = self.edgeconv1(x)
-            x = self.edgeconv2(x)
-            x = self.edgeconv3(x)
+            x = self.edgeconv1(batched_data.x, batch=batched_data.batch)
+            x = self.edgeconv2(x, batch=batched_data.batch)
+            x = self.edgeconv3(x, batch=batched_data.batch)
 
             lstm_inputs[i, :, :] = x
 
@@ -546,6 +574,9 @@ class Edgeconvmodel(torch.nn.Module):
         weather_repeated = data.weather[:, -1, :].repeat(nodes, 1)
         time_repeated = data.time_encoding[:, -1, :].repeat(nodes, 1)
         out_embedded = torch.cat([out, weather_repeated, time_repeated], dim=1)
+
+        if self.gpu:
+            out_embedded = out_embedded.cuda()
 
         prediction = self.linear(out_embedded)
 

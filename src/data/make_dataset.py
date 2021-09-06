@@ -51,28 +51,35 @@ def main(input_filepath, output_filepath):
                 time_intervals=file_dict["HOUR_INTERVAL"] + "h",
             )
 
-            df = create_grid(df, lng_col=file_dict["LNG_COL"], lat_col=file_dict["LAT_COL"], splits=10)
+            if station_column is not None:
+                df["grid_id"] = df[station_column]
+            else:
+                df = create_grid(df, lng_col=file_dict["LNG_COL"], lat_col=file_dict["LAT_COL"], splits=10)
 
-            df["grid_id"] = create_grid_ids(
-                df, longitude_col=file_dict["LNG_COL"] + "_binned", lattitude_col=file_dict["LAT_COL"] + "_binned"
-            )
+                df["grid_id"] = create_grid_ids(
+                    df, longitude_col=file_dict["LNG_COL"] + "_binned", lattitude_col=file_dict["LAT_COL"] + "_binned"
+                )
 
             # THIS ORDERING HAS TO BE THE EXACT SAME ALL THE TIME!!!
             region_ordering = df["grid_id"].unique()
-            # ADD NODES THAT DONT EXIST (GRID REGIONS WHERE NO OBSERVATIONS OCCUR)
-            """for i in range(10):
-                for j in range(10):
-                    grid_id = f"{i}{j}"
-                    if not f"{i}{j}" in region_ordering:
-                        region_ordering = np.append(region_ordering, grid_id)"""
-
-            # CORRELATION ADJ MATRIX
-            """adj_mat = correlation_adjacency_matrix(
-                rides_df=df, region_ordering=region_ordering, id_col="grid_id", time_col=file_dict["TIME_COL"]
-            )"""
-
-            # NEIGHBOURHOOD ADJ MATRIX
-            adj_mat = neighbourhood_adjacency_matrix(region_ordering=region_ordering)
+            
+            
+            if file_dict["GRAPH"] == "CORR":
+                # CORRELATION ADJ MATRIX
+                adj_mat = correlation_adjacency_matrix(
+                    rides_df=df, region_ordering=region_ordering, id_col="grid_id", time_col=file_dict["TIME_COL"]
+                )
+            elif file_dict["GRAPH"] == "GRID":
+                # NEIGHBOURHOOD ADJ MATRIX
+                adj_mat = neighbourhood_adjacency_matrix(region_ordering=region_ordering)
+                # ADD NODES THAT DONT EXIST (GRID REGIONS WHERE NO OBSERVATIONS OCCUR)
+                """for i in range(10):
+                    for j in range(10):
+                        grid_id = f"{i}{j}"
+                        if not f"{i}{j}" in region_ordering:
+                            region_ordering = np.append(region_ordering, grid_id)"""
+            else:
+                adj_mat = np.eye(len(region_ordering))
 
             # encode time & weather
             mean_lon = df[file_dict["LNG_COL"]].mean()
