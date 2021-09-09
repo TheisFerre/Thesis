@@ -137,7 +137,7 @@ def neighbourhood_adjacency_matrix(region_ordering: List[str]):
 
 
 def correlation_adjacency_matrix(
-    rides_df: pd.DataFrame, region_ordering: List[str], id_col: str, time_col: str, threshold: float = 0.7
+    rides_df: pd.DataFrame, region_ordering: List[str], id_col: str, time_col: str, threshold: float = 0.25
 ) -> pd.DataFrame:
     """
     Creates adjacency matrix, where the correlation of historical rides
@@ -148,31 +148,27 @@ def correlation_adjacency_matrix(
     """
 
     correlation_graph = np.zeros((len(region_ordering), len(region_ordering)))
-    grouped_df = rides_df.groupby([time_col, id_col])
 
-    for i, node_base in tqdm(enumerate(region_ordering), total=len(region_ordering)):
+    for i, node_base in tqdm.tqdm(enumerate(region_ordering), total=len(region_ordering)):
         for j, node_compare in enumerate(region_ordering):
             if i > j or i == j:
                 continue
-            node1_val_list = []
-            node2_val_list = []
-            for time in np.sort(rides_df[time_col].unique()):
-                try:
-                    node1_val_list.append(len(grouped_df.get_group((time, node_base))))
-                except KeyError:
-                    node1_val_list.append(0)
 
-                try:
-                    node2_val_list.append(len(grouped_df.get_group((time, node_compare))))
-                except KeyError:
-                    node2_val_list.append(0)
+            df_1 = rides_df[rides_df[id_col] == node_base]
+            df_2 = rides_df[rides_df[id_col] == node_compare]
 
-            corr_coef = np.abs(np.corrcoef(node1_val_list, node2_val_list)[0, 1])
+            counts_1 = df_1[time_col].value_counts()
+            counts_2 = df_2[time_col].value_counts()
+
+            idx_intersections = counts_1.index.intersection(counts_2.index)
+
+            values_1 = counts_1.loc[idx_intersections].values
+            values_2 = counts_2.loc[idx_intersections].values
+
+            corr_coef = np.abs(np.corrcoef(values_1, values_2)[0, 1])
             if corr_coef > threshold:
-                # in paper it is set to 1, whenever above threshold
                 correlation_graph[i, j] = 1  # corr_coef
                 correlation_graph[j, i] = 1  # corr_coef
-
     return correlation_graph
 
 
@@ -240,7 +236,7 @@ def features_targets_and_externals(
 
             except KeyError:
                 node_inflows[t, i] = 0
-            
+
             lat_vals[t, i] = lat_dict[node]
             lng_vals[t, i] = lng_dict[node]
 
@@ -335,8 +331,12 @@ class Dataset:
         self.time_encoding = np.expand_dims(time_encoding, -1)
         self.edge_index, self.edge_weight = from_scipy_sparse_matrix(self.scipy_graph)
         self.edge_weight = self.edge_weight.type(torch.FloatTensor)
-        self.latitude = np.expand_dims((latitude - latitude.mean(axis=-1).reshape(-1, 1)) / latitude.std(axis=-1).reshape(-1, 1), -1)
-        self.longitude = np.expand_dims((longitude - longitude.mean(axis=-1).reshape(-1, 1)) / longitude.std(axis=-1).reshape(-1, 1), -1)
+        self.latitude = np.expand_dims(
+            (latitude - latitude.mean(axis=-1).reshape(-1, 1)) / latitude.std(axis=-1).reshape(-1, 1), -1
+        )
+        self.longitude = np.expand_dims(
+            (longitude - longitude.mean(axis=-1).reshape(-1, 1)) / longitude.std(axis=-1).reshape(-1, 1), -1
+        )
 
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
@@ -395,8 +395,6 @@ class Dataset:
 
             targets_prep = torch.Tensor(self.target_scaler.transform(targets_prep))
 
-
-
         dataset = CustomTemporalSignal(
             weather_information=weather_prep,
             time_encoding=time_prep,
@@ -405,12 +403,18 @@ class Dataset:
             features=X_prep,
             targets=targets_prep,
             latitude=lat_prep,
-            longitude=lng_prep
+            longitude=lng_prep,
         )
         return dataset
 
     @staticmethod
-    def train_test_split(dataset: Union[CustomTemporalSignal, "Dataset"], num_history: int = 4, ratio: float = 0.8, scale: bool = True):
+    def train_test_split(
+        dataset: Union[CustomTemporalSignal, "Dataset"],
+        num_history: int = 4,
+        ratio: float = 0.8,
+        scale: bool = True,
+        shuffle: bool = True,
+    ):
         if isinstance(dataset, CustomTemporalSignal):
             train, test = temporal_signal_split(dataset, train_ratio=ratio)
         elif isinstance(dataset, Dataset):
@@ -421,10 +425,14 @@ class Dataset:
         return train, test
 
 
-def temporal_signal_split(data_iterator, train_ratio: float = 0.8):
+def temporal_signal_split(data_iterator, train_ratio: float = 0.8, shuffle: bool = True):
     np.random.seed(42)
     train_snapshots = int(train_ratio * len(data_iterator))
-    permutation = np.random.permutation(len(data_iterator))
+    # Shuffle test/train otherwise take last datapoints for testing
+    if shuffle:
+        permutation = np.random.permutation(len(data_iterator))
+    else:
+        permutation = np.arange(len(data_iterator))
     train_idx = permutation[0:train_snapshots]
     test_idx = permutation[train_snapshots:]
 
@@ -436,7 +444,7 @@ def temporal_signal_split(data_iterator, train_ratio: float = 0.8):
         features=data_iterator.features[train_idx],
         targets=data_iterator.targets[train_idx],
         latitude=data_iterator.latitude,
-        longitude=data_iterator.longitude
+        longitude=data_iterator.longitude,
     )
 
     test_iterator = CustomTemporalSignal(
@@ -447,7 +455,7 @@ def temporal_signal_split(data_iterator, train_ratio: float = 0.8):
         features=data_iterator.features[test_idx],
         targets=data_iterator.targets[test_idx],
         latitude=data_iterator.latitude,
-        longitude=data_iterator.longitude
+        longitude=data_iterator.longitude,
     )
 
     return train_iterator, test_iterator
