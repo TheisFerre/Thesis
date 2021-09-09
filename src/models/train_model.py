@@ -1,4 +1,4 @@
-from src.models.models import Edgeconvmodel, GATLSTM, Encoder, Decoder, STGNNModel
+from src.models.models import Edgeconvmodel, GATLSTM, Encoder, Decoder, STGNNModel, BaselineGNNLSTM
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -83,6 +83,16 @@ def train_model(
             hidden_size=hidden_size,
             dropout_p=dropout_p
         )
+    elif model == "baselinegnn":
+        model = BaselineGNNLSTM(
+            node_in_features=1,
+            weather_features=weather_features,
+            time_features=time_features,
+            node_out_features=node_out_feature,
+            gpu=gpu,
+            hidden_size=hidden_size,
+            dropout_p=dropout_p
+        )
     else:
         assert False, "Please provide a correct model name!"
 
@@ -104,7 +114,6 @@ def train_model(
                 test_loss += criterion(batch.y, out.view(batch.num_graphs, -1)).item()
                 num_batch_test += 1
         torch.cuda.empty_cache()
-        logger.info("Made it past here!")
 
         model.train()
         train_loss = 0
