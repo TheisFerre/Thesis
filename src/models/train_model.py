@@ -34,7 +34,7 @@ def train_model(
     gpu: bool = False
 ):
 
-    train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=8, ratio=train_size)
+    train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=12, ratio=train_size, shuffle=False)
 
     train_data_list = []
     for i in range(len(train_dataset)):
@@ -69,8 +69,7 @@ def train_model(
             time_features=time_features,
             weather_features=weather_features,
             hidden_size=hidden_size,
-            gpu=gpu,
-            dropout_p=dropout_p
+            gpu=gpu
         )
         decoder = Decoder(node_out_features=node_out_feature, num_nodes=num_nodes)
         model = STGNNModel(encoder, decoder)
@@ -104,6 +103,8 @@ def train_model(
                 out = model(batch.to(DEVICE))
                 test_loss += criterion(batch.y, out.view(batch.num_graphs, -1)).item()
                 num_batch_test += 1
+        torch.cuda.empty_cache()
+        logger.info("Made it past here!")
 
         model.train()
         train_loss = 0
