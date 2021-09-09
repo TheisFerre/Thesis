@@ -416,9 +416,11 @@ class Dataset:
         shuffle: bool = True,
     ):
         if isinstance(dataset, CustomTemporalSignal):
-            train, test = temporal_signal_split(dataset, train_ratio=ratio)
+            train, test = temporal_signal_split(dataset, train_ratio=ratio, shuffle=shuffle)
         elif isinstance(dataset, Dataset):
-            train, test = temporal_signal_split(dataset.create_temporal_dataset(num_history), train_ratio=ratio)
+            train, test = temporal_signal_split(
+                dataset.create_temporal_dataset(num_history), train_ratio=ratio, shuffle=shuffle
+            )
         else:
             print("input type is not correct...")
 
@@ -431,8 +433,10 @@ def temporal_signal_split(data_iterator, train_ratio: float = 0.8, shuffle: bool
     # Shuffle test/train otherwise take last datapoints for testing
     if shuffle:
         permutation = np.random.permutation(len(data_iterator))
+        print("Shuffling data...")
     else:
         permutation = np.arange(len(data_iterator))
+        print("Not shuffling data...")
     train_idx = permutation[0:train_snapshots]
     test_idx = permutation[train_snapshots:]
 
