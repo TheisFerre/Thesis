@@ -15,11 +15,11 @@ cd ~/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=../../data/processed/citibike-tripdata.pkl
+DATA=../../data/processed/citibike2014-tripdata-regions.pkl
 MODEL=edgeconv
 NUM_HISTORY=12
-TRAIN_SIZE=0.8
-BATCH_SIZE=64
+TRAIN_SIZE=0.9421
+BATCH_SIZE=32
 EPOCHS=250
 WEIGHT_DECAY=0.00001
 LEARNING_RATE=0.001

@@ -15,10 +15,10 @@ cd ~/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=../../data/processed/citibike2014-tripdata.pkl
+DATA=../../data/processed/citibike2014-tripdata-regions.pkl
 MODEL=seq2seq-gnn
 NUM_HISTORY=12
-TRAIN_SIZE=0.8
+TRAIN_SIZE=0.9421
 BATCH_SIZE=64
 EPOCHS=500
 WEIGHT_DECAY=0.01
