@@ -97,6 +97,7 @@ models/run*
 models/seq2seq*
 models/gatlstm*
 models/edgeconv*
+models/baselinegnn*
 notebooks/*
 
 venv-thesis/*

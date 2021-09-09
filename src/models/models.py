@@ -612,8 +612,8 @@ class BaselineGNNLSTM(torch.nn.Module):
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
         self.gpu = gpu
-        self.conv1_sh = GCNConv(node_in_features, 32)
-        self.conv2_sh = GCNConv(32, node_out_features)
+        self.conv1_sh = GATv2Conv(node_in_features, 32)
+        self.conv2_sh = GATv2Conv(32, node_out_features)
         self.lstm = torch.nn.LSTM(
             input_size=node_out_features,
             hidden_size=self.hidden_size,
