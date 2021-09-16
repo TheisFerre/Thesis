@@ -46,10 +46,10 @@ def objective(trial):
     # GET OPTIMIZATION INFORMATION!
 
     optimizer_name = "RMSprop"
-    node_out_features = trial.suggest_int("node_out_features", 6, 32)
-    hidden_size = trial.suggest_int("hidden_size", 12, 64)
+    node_out_features = trial.suggest_int("node_out_features", 6, 20)
+    hidden_size = trial.suggest_int("hidden_size", 12, 40)
     dropout_p = trial.suggest_float("dropout_p", 0.2, 0.6)
-    k = trial.suggest_int("K", 15, 50)
+    k = trial.suggest_int("K", 15, 40)
     weight_decay = trial.suggest_float("weight_decay", 1e-8, 1e-3, log=True)
     learning_rate = trial.suggest_float("lr", 1e-6, 1e-2, log=True)
 
@@ -116,6 +116,7 @@ def objective(trial):
             logger.info(f"Epoch avg RMSE loss (TRAIN): {train_losses[-1]}")
             logger.info(f"Epoch avg RMSE loss (TEST): {test_losses[-1]}")
             logger.info("-" * 10)
+            torch.cuda.empty_cache()
 
         trial.report(test_loss, EPOCH)
 
