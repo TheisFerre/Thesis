@@ -46,10 +46,10 @@ def objective(trial):
     # GET OPTIMIZATION INFORMATION!
 
     optimizer_name = "RMSprop"
-    node_out_features = 20#trial.suggest_int("node_out_features", 6, 20)
-    hidden_size = 40#trial.suggest_int("hidden_size", 12, 40)
+    node_out_features = trial.suggest_int("node_out_features", 6, 16)
+    hidden_size = trial.suggest_int("hidden_size", 12, 40)
     dropout_p = trial.suggest_float("dropout_p", 0.2, 0.6)
-    k = 20#trial.suggest_int("K", 15, 40)
+    k = trial.suggest_int("K", 15, 35)
     weight_decay = trial.suggest_float("weight_decay", 1e-8, 1e-3, log=True)
     learning_rate = trial.suggest_float("lr", 1e-6, 1e-2, log=True)
 
