@@ -612,6 +612,77 @@ class BaselineGNNLSTM(torch.nn.Module):
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
         self.gpu = gpu
+        self.conv1_sh = GraphConv(node_in_features, 32)
+        self.conv2_sh = GraphConv(32, node_out_features)
+        self.lstm = torch.nn.LSTM(
+            input_size=node_out_features,
+            hidden_size=self.hidden_size,
+            batch_first=True,
+        )
+        self.linear = torch.nn.Linear(self.hidden_size + self.weather_features + self.time_features, 1)
+
+    def forward(self, data: Data):
+        batch_size, num_hist, nodes = data.x.shape
+        # SHAPE (SEQ LENGTH, BATCHSIZE X NUM_NODES, NODE_OUT_FEATURES)
+        
+        lstm_inputs = torch.zeros((num_hist, batch_size * nodes, self.node_out_features))
+        if self.gpu:
+            lstm_inputs = lstm_inputs.cuda()
+
+        for i in range(num_hist):
+            x, edge_index, edge_weight = data.x[:, i, :], data.edge_index, data.edge_attr
+            x = x.reshape(-1, 1)
+
+            x = self.conv1_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
+            x = F.relu(x)
+            x = F.dropout(x, self.dropout_p, training=self.training)
+            x = self.conv2_sh(x=x, edge_index=edge_index)  # , edge_weight=edge_weight)
+
+            lstm_inputs[i, :, :] = x
+
+        # only take last output
+        out, _ = self.lstm(lstm_inputs)
+        out = out[-1]
+        weather_repeated = data.weather[:, -1, :].repeat(nodes, 1)
+        time_repeated = data.time_encoding[:, -1, :].repeat(nodes, 1)
+        out_embedded = torch.cat([out, weather_repeated, time_repeated], dim=1)
+        if self.gpu:
+            out_embedded = out_embedded.cuda()
+
+        prediction = self.linear(out_embedded)
+
+        prediction = prediction.reshape(batch_size, nodes, 1)
+
+        return prediction
+
+
+class BaselineGATLSTM(torch.nn.Module):
+    """
+    This model is using a stand GNN layer to embed nodes
+    It computes features for each node in the graph over q time steps.
+    A LSTM model then takes the sequence of q node features (for each node)
+    the last output of the LSTM model is then fed into a linear layer
+    that also takes into account the weather and time features
+    """
+
+    def __init__(
+        self,
+        node_in_features: int,
+        weather_features: int,
+        time_features: int,
+        node_out_features: int = 8,
+        hidden_size: int = 64,
+        dropout_p: float = 0.3,
+        gpu: bool = False
+    ):
+        super(BaselineGATLSTM, self).__init__()
+        self.node_in_features = node_in_features
+        self.weather_features = weather_features
+        self.time_features = time_features
+        self.node_out_features = node_out_features
+        self.hidden_size = hidden_size
+        self.dropout_p = dropout_p
+        self.gpu = gpu
         self.conv1_sh = GATv2Conv(node_in_features, 32)
         self.conv2_sh = GATv2Conv(32, node_out_features)
         self.lstm = torch.nn.LSTM(
@@ -654,4 +725,3 @@ class BaselineGNNLSTM(torch.nn.Module):
         prediction = prediction.reshape(batch_size, nodes, 1)
 
         return prediction
-
