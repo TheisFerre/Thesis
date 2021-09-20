@@ -132,10 +132,20 @@ def objective(trial):
 
 if __name__ == "__main__":
     start_time = datetime.datetime.now()
+    logging.basicConfig(
+        filename="/home/s163700/Thesis/models/gatlstm-logs.log",
+        filemode='a',
+        format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+        datefmt='%H:%M:%S',
+        level=logging.INFO
+    )
+
+    logger = logging.getLogger(__name__)
+
     logger.info(f"Starting search: {str(start_time)}")
     study = optuna.create_study(
         direction="minimize", 
-        pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=50, interval_steps=10)
+        pruner=optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=40, interval_steps=10)
     )
     study.optimize(objective, n_trials=75)
     end_time = datetime.datetime.now()
