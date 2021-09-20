@@ -1,4 +1,4 @@
-from src.models.models import Edgeconvmodel, GATLSTM, Encoder, Decoder, STGNNModel
+from src.models.models import Edgeconvmodel, BaselineGNNLSTM, Encoder, Decoder, STGNNModel
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -54,7 +54,7 @@ def objective(trial):
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 0.5, log=True)
     learning_rate = trial.suggest_float("lr", 1e-6, 1e-2, log=True)
 
-    model = GATLSTM(
+    model = BaselineGNNLSTM(
         node_in_features=1,
         weather_features=weather_features,
         time_features=time_features,
