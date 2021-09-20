@@ -17,11 +17,8 @@ from optuna.trial import TrialState
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-open_file = open("../../data/processed/202106-citibike-tripdata.pkl", "rb")
+open_file = open("/home/s163700/Thesis/data/processed/citibike2014-tripdata-regions.pkl", "rb")
 dataset = dill.load(open_file)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def objective(trial):
