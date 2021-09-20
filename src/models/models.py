@@ -602,6 +602,7 @@ class BaselineGNNLSTM(torch.nn.Module):
         node_out_features: int = 8,
         hidden_size: int = 64,
         dropout_p: float = 0.3,
+        graph_hidden_size: int = 32,
         gpu: bool = False
     ):
         super(BaselineGNNLSTM, self).__init__()
@@ -612,8 +613,8 @@ class BaselineGNNLSTM(torch.nn.Module):
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
         self.gpu = gpu
-        self.conv1_sh = GraphConv(node_in_features, 32)
-        self.conv2_sh = GraphConv(32, node_out_features)
+        self.conv1_sh = GraphConv(node_in_features, graph_hidden_size)
+        self.conv2_sh = GraphConv(graph_hidden_size, node_out_features)
         self.lstm = torch.nn.LSTM(
             input_size=node_out_features,
             hidden_size=self.hidden_size,
