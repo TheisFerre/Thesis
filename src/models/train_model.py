@@ -1,4 +1,4 @@
-from src.models.models import Edgeconvmodel, GATLSTM, Encoder, Decoder, STGNNModel, BaselineGNNLSTM
+from src.models.models import BaselineGATLSTM, Edgeconvmodel, GATLSTM, Encoder, Decoder, STGNNModel, BaselineGNNLSTM
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -87,6 +87,17 @@ def train_model(
         )
     elif model == "baselinegnn":
         model = BaselineGNNLSTM(
+            node_in_features=1,
+            weather_features=weather_features,
+            time_features=time_features,
+            node_out_features=node_out_feature,
+            gpu=gpu,
+            hidden_size=hidden_size,
+            graph_hidden_size=graph_hidden_size,
+            dropout_p=dropout_p
+        )
+    elif model == "baselinegat":
+        model = BaselineGATLSTM(
             node_in_features=1,
             weather_features=weather_features,
             time_features=time_features,
