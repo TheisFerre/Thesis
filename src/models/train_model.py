@@ -31,6 +31,7 @@ def train_model(
     optimizer_name: str = "Adam",
     node_out_feature: int = 12, 
     dropout_p: float = 0.3,
+    k: int = 30,
     gpu: bool = False
 ):
 
@@ -56,7 +57,7 @@ def train_model(
             time_features=time_features,
             node_out_features=node_out_feature,
             gpu=gpu,
-            k=30,
+            k=k,
             hidden_size=hidden_size,
             dropout_p=dropout_p
         )
@@ -170,6 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--optimizer", type=str, default="Adam")
     parser.add_argument("-no", "--node_out_feature", type=int, default=12)
     parser.add_argument("-dp", "--dropout", type=float, default=0.3)
+    parser.add_argument("-k", "--k_neighbours", type=int, default=30)
     parser.add_argument("-g", "--gpu", action='store_true')
 
     args = parser.parse_args()
@@ -193,6 +195,7 @@ if __name__ == "__main__":
         hidden_size=args.hidden_size,
         dropout_p=args.dropout,
         node_out_feature=args.node_out_feature,
+        k=args.k_neighbours,
         gpu=args.gpu
     )
     end_time = datetime.datetime.now()
