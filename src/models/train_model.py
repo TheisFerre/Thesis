@@ -32,6 +32,7 @@ def train_model(
     node_out_feature: int = 12, 
     dropout_p: float = 0.3,
     k: int = 30,
+    graph_hidden_size: int = 32,
     gpu: bool = False
 ):
 
@@ -92,6 +93,7 @@ def train_model(
             node_out_features=node_out_feature,
             gpu=gpu,
             hidden_size=hidden_size,
+            graph_hidden_size=graph_hidden_size,
             dropout_p=dropout_p
         )
     else:
@@ -172,6 +174,8 @@ if __name__ == "__main__":
     parser.add_argument("-no", "--node_out_feature", type=int, default=12)
     parser.add_argument("-dp", "--dropout", type=float, default=0.3)
     parser.add_argument("-k", "--k_neighbours", type=int, default=30)
+    parser.add_argument("-gh", "--graph_hidden_size", type=int, default=32)
+
     parser.add_argument("-g", "--gpu", action='store_true')
 
     args = parser.parse_args()
@@ -196,6 +200,7 @@ if __name__ == "__main__":
         dropout_p=args.dropout,
         node_out_feature=args.node_out_feature,
         k=args.k_neighbours,
+        graph_hidden_size=args.graph_hidden_size,
         gpu=args.gpu
     )
     end_time = datetime.datetime.now()
