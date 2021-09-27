@@ -53,15 +53,16 @@ def train_model(
         dropout_p=0.2
     )
 
+    model.to(DEVICE)
+
     maml = l2l.algorithms.MAML(model, lr=adapt_lr, first_order=True, allow_unused=True)
     opt = optim.Adam(maml.parameters(), meta_lr)
     lossfn = torch.nn.MSELoss(reduction='mean')
 
-    if batch_task_size == -1:
+    if batch_task_size == -1 or batch_task_size > len(train_datasets.keys()):
         batch_task_size = len(train_datasets.keys())
 
-    if log_dir is not None:
-        writer = SummaryWriter()
+    writer = SummaryWriter(log_dir=log_dir)
     step_dict = {f_name: 0 for f_name in train_datasets.keys()}
 
     for epoch in range(epochs):
@@ -151,7 +152,7 @@ if __name__ == "__main__":
     start_time = datetime.datetime.now()
     logger.info(f"Fitting model at time: {str(start_time)}")
     if args.log_dir is not None:
-        log_dir = f"{args.log_dir}/{start_time.strftime('%Y-%m-%d %H:%M:%S')}"
+        log_dir = f"{args.log_dir}/{start_time.isoformat()}"
     else:
         log_dir = None
 

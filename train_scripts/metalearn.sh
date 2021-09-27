@@ -1,5 +1,5 @@
 #!/bin/sh
-#BSUB -J baseline-TRAIN #The name the job will get
+#BSUB -J METALEARN #The name the job will get
 #BSUB -q gpuv100 #The queue the job will be committed to, here the GPU enabled queue
 #BSUB -gpu "num=1:mode=exclusive_process" #How the job will be run on the VM, here I request 1 GPU with exclusive access i.e. only my c #BSUB -n 1 How many CPU cores my job request
 #BSUB -W 24:00 #The maximum runtime my job have note that the queuing might enable shorter jobs earlier due to scheduling.
@@ -10,32 +10,28 @@
 #BSUB -e logs/ERROR.%J #Error log file
 echo "Starting:"
 
-cd ~/Thesis/src/models
+cd ~/Thesis/metalearning
 #cd /Users/theisferre/Documents/SPECIALE/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=../../data/processed/citibike2014-tripdata-regions.pkl
-MODEL=baselinegat
-NUM_HISTORY=12
-TRAIN_SIZE=0.9421
-BATCH_SIZE=32
+DATA_DIR=/zhome/2b/7/117471/Thesis/data/processed/metalearning
+TRAIN_SIZE=0.8
+BATCH_TASK_SIZE=8
+K_SHOT=5
+ADAPTATION_STEPS=5
 EPOCHS=250
-WEIGHT_DECAY=0.000024
-LEARNING_RATE=0.003
-LR_FACTOR=0.1
-LR_PATIENCE=50
-OPTIMIZER=RMSprop
-NODE_OUT_FEATURES=29
-HIDDEN_SIZE=49
-DROPOUT_P=0.36
-GRAPH_HIDDEN_SIZE=25
+ADAPT_LR=0.001
+META_LR=0.001
+LOG_DIR=/zhome/2b/7/117471/Thesis/metalearning
 
 
 
 
-python train_model.py --data $DATA --model $MODEL --num_history $NUM_HISTORY --train_size $TRAIN_SIZE \
---batch_size $BATCH_SIZE --epochs $EPOCHS --weight_decay $WEIGHT_DECAY --learning_rate $LEARNING_RATE \
---lr_factor $LR_FACTOR --lr_patience $LR_PATIENCE --optimizer $OPTIMIZER --hidden_size $HIDDEN_SIZE \
---node_out_feature $NODE_OUT_FEATURES --dropout $DROPOUT_P --graph_hidden_size $GRAPH_HIDDEN_SIZE --gpu
+python /zhome/2b/7/117471/Thesis/src/models/train_meta.py --data_dir $DATA_DIR --train_size $TRAIN_SIZE --batch_task_size $BATCH_TASK_SIZE \
+--k_shot $K_SHOT --adaptation_steps $ADAPTATION_STEPS --epochs $EPOCHS --adapt_lr $ADAPT_LR --meta_lr $META_LR --log_dir $LOG_DIR --gpu
+
+
+
+
 
