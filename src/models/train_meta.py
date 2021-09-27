@@ -39,6 +39,7 @@ def train_model(
     adaptation_steps: int = 5,
     weather_features: int = 4,
     time_features: int = 43,
+    log_dir: str = None,
     gpu: bool = False
 ):
 
@@ -59,7 +60,8 @@ def train_model(
     if batch_task_size == -1:
         batch_task_size = len(train_datasets.keys())
 
-    writer = SummaryWriter()
+    if log_dir is not None:
+        writer = SummaryWriter()
     step_dict = {f_name: 0 for f_name in train_datasets.keys()}
 
     for epoch in range(epochs):
@@ -122,6 +124,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--epochs", type=int, default=200, help="number of epochs")
     parser.add_argument("-alr", "--adapt_lr", type=float, default=0.001, help="Adaptation learning rate")
     parser.add_argument("-mlr", "--meta_lr", type=float, default=0.001, help="Meta learning rate")
+    parser.add_argument("-ld", "--log_dir", type=str, default=None, help="directory to log stuff")
     parser.add_argument("-g", "--gpu", action='store_true')
 
     args = parser.parse_args()
@@ -147,6 +150,10 @@ if __name__ == "__main__":
 
     start_time = datetime.datetime.now()
     logger.info(f"Fitting model at time: {str(start_time)}")
+    if args.log_dir is not None:
+        log_dir = f"{args.log_dir}/{start_time.strftime('%Y-%m-%d %H:%M:%S')}"
+    else:
+        log_dir = None
 
     model, train_loss, test_loss = train_model(
         train_datasets=train_dataloader_dict,
@@ -158,6 +165,7 @@ if __name__ == "__main__":
         meta_lr=args.meta_lr,
         weather_features=WEATHER_FEATURES,
         time_features=TIME_FEATURES,
+        log_dir=log_dir,
         gpu=args.gpu
     )
 
