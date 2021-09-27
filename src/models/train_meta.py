@@ -108,6 +108,8 @@ def train_model(
         opt.zero_grad()
         meta_train_loss.backward()
         opt.step()
+    
+    return model
 
 
 
@@ -156,7 +158,7 @@ if __name__ == "__main__":
     else:
         log_dir = None
 
-    model, train_loss, test_loss = train_model(
+    model = train_model(
         train_datasets=train_dataloader_dict,
         test_datasets=test_dataloader_dict,
         adaptation_steps=args.adaptation_steps,
@@ -169,6 +171,9 @@ if __name__ == "__main__":
         log_dir=log_dir,
         gpu=args.gpu
     )
+
+    model.to("cpu")
+    torch.save(model.state_dict(), f"{log_dir}/model.pth")
 
     """end_time = datetime.datetime.now()
     end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
