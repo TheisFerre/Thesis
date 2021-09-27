@@ -209,22 +209,23 @@ def features_targets_and_externals(
 
     grouped_df = df.groupby([time_col, id_col])
 
-    node_inflows = np.zeros((len(df[time_col].unique()), len(region_ordering), 1))
-    lat_vals = np.zeros((len(df[time_col].unique()), len(region_ordering)))
-    lng_vals = np.zeros((len(df[time_col].unique()), len(region_ordering)))
+    dt_range = pd.date_range(df[time_col].min(), df[time_col].max(), freq=time_interval)
 
-    targets = np.zeros((len(df[time_col].unique()) - 1, len(region_ordering)))
+    node_inflows = np.zeros((len(dt_range), len(region_ordering), 1))
+    lat_vals = np.zeros((len(dt_range), len(region_ordering)))
+    lng_vals = np.zeros((len(dt_range), len(region_ordering)))
+
+    targets = np.zeros((len(dt_range) - 1, len(region_ordering)))
 
     # arrays for external data
-    weather_external = np.zeros((len(df[time_col].unique()), 4))
+    weather_external = np.zeros((len(dt_range), 4))
     num_cats = 0
     for cats in time_encoder.categories_:
         num_cats += len(cats)
-    time_external = np.zeros((len(df[time_col].unique()), num_cats))
+    time_external = np.zeros((len(dt_range), num_cats))
 
     # Loop through every (timestep, node) pair in dataset. For each find number of outflows and set as feature
     # also set the next timestep for the same node as the target.
-    dt_range = pd.date_range(df[time_col].min(), df[time_col].max(), freq=time_interval)
 
     for t, starttime in tqdm(enumerate(dt_range), total=len(dt_range)):
         for i, node in enumerate(region_ordering):
