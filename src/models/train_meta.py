@@ -71,8 +71,8 @@ def train_model(
         for f_name, task in random.sample(train_datasets.items(), batch_task_size):
             learner = maml.clone()
 
-            support_data = next(iter(task))
-            query_data = next(iter(task))
+            support_data = next(iter(task)).to(DEVICE)
+            query_data = next(iter(task)).to(DEVICE)
 
             for _ in range(5):  # adaptation_steps
                 support_preds = learner(support_data)
