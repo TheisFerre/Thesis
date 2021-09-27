@@ -55,7 +55,7 @@ def train_model(
 
     model.to(DEVICE)
 
-    maml = l2l.algorithms.MAML(model, lr=adapt_lr, first_order=True, allow_unused=True)
+    maml = l2l.algorithms.MAML(model, lr=adapt_lr, first_order=False)
     opt = optim.Adam(maml.parameters(), meta_lr)
     lossfn = torch.nn.MSELoss(reduction='mean')
 
@@ -88,15 +88,6 @@ def train_model(
             meta_train_loss += query_loss
 
         meta_train_loss = meta_train_loss / batch_task_size
-
-        """with torch.no_grad():
-            grid_pred = edgeconv(test_batch_dataloader_grid)
-            grid_loss = lossfn(test_batch_dataloader_grid.y, grid_pred.view(test_batch_dataloader_grid.num_graphs, -1))
-            print(f"Loss on Grid-data: {grid_loss.item()}")
-
-            region_pred = edgeconv(test_batch_dataloader_regions)
-            region_loss = lossfn(test_batch_dataloader_regions.y, region_pred.view(test_batch_dataloader_regions.num_graphs, -1))
-            print(f"Loss on Region-data: {region_loss.item()}")"""
 
         if epoch % 1 == 0:
             print(f"Epoch: {epoch+1}")
