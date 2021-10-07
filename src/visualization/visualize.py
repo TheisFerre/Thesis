@@ -4,16 +4,16 @@ import matplotlib.pyplot as plt
 
 
 def plot_losses(losses: dict):
+    fig, ax = plt.subplots()
     if "train_loss" in losses and "test_loss" in losses:
-        plt.plot(range(1, len(losses["train_loss"]) + 1), losses["train_loss"], label="Train loss (RMSE)")
-        plt.plot(range(1, len(losses["test_loss"]) + 1), losses["test_loss"], label="Test loss (RMSE)")
-        plt.legend()
-        plt.show()
+        ax.plot(range(1, len(losses["train_loss"]) + 1), losses["train_loss"], label="Train loss (RMSE)")
+        ax.plot(range(1, len(losses["test_loss"]) + 1), losses["test_loss"], label="Test loss (RMSE)")
+        ax.legend()
     else:
         for key, value in losses.items():
-            plt.plot(range(1, len(value) + 1), value, label=key)
-            plt.legend()
-            plt.show()
+            ax.plot(range(1, len(value) + 1), value, label=key)
+            ax.legend()
+    return fig, ax
 
 def plot_errs_pr_node(test_errs, train_errs, num_nodes: int):
 
