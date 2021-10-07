@@ -36,7 +36,7 @@ def train_model(
     gpu: bool = False
 ):
 
-    train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=12, ratio=train_size, shuffle=False)
+    train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=12, ratio=train_size, shuffle=True)
 
     train_data_list = []
     for i in range(len(train_dataset)):
@@ -152,7 +152,7 @@ def train_model(
         if lr_factor < 1:
             scheduler.step(test_loss)
 
-        if EPOCH % 25 == 0:
+        if EPOCH % 5 == 0:
 
             logger.info(f"Epoch number {EPOCH+1}")
             logger.info(f"Epoch avg RMSE loss (TRAIN): {train_losses[-1]}")
@@ -194,6 +194,8 @@ if __name__ == "__main__":
     dataset = dill.load(open_file)
 
     start_time = datetime.datetime.now()
+    logger.info(str(vars(args)))
+    logger.info(open_file)
     logger.info(f"Fitting model at time: {str(start_time)}")
     model, train_loss, test_loss = train_model(
         dataset=dataset,

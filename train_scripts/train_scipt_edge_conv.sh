@@ -15,19 +15,19 @@ cd ~/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=../../data/processed/citibike2014-tripdata-regions.pkl
+DATA=/zhome/2b/7/117471/Thesis/data/processed/metalearning/yellow-taxi2020-nov-REGION.pkl
 MODEL=edgeconv
 NUM_HISTORY=12
-TRAIN_SIZE=0.9421
-BATCH_SIZE=64
-EPOCHS=250
-WEIGHT_DECAY=0.001
-LEARNING_RATE=0.001
+TRAIN_SIZE=0.9
+BATCH_SIZE=24
+EPOCHS=150
+WEIGHT_DECAY=0.000000000001
+LEARNING_RATE=0.0005
 LR_FACTOR=0.1
-LR_PATIENCE=50
+LR_PATIENCE=25
 OPTIMIZER=RMSprop
 NODE_OUT_FEATURES=10
-HIDDEN_SIZE=24
+HIDDEN_SIZE=46
 DROPOUT_P=0.2
 
 

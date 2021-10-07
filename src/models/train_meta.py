@@ -40,6 +40,9 @@ def train_model(
     weather_features: int = 4,
     time_features: int = 43,
     log_dir: str = None,
+    dropout: float = 0.2,
+    hidden_size: int = 32,
+    node_out_features: int = 10,
     gpu: bool = False
 ):
 
@@ -47,15 +50,15 @@ def train_model(
         node_in_features=1,
         weather_features=weather_features,
         time_features=time_features,
-        node_out_features=10,
+        node_out_features=node_out_features,
         gpu=gpu,
-        hidden_size=46,
-        dropout_p=0.2
+        hidden_size=hidden_size,
+        dropout_p=dropout
     )
 
     model.to(DEVICE)
 
-    maml = l2l.algorithms.MAML(model, lr=adapt_lr, first_order=False)
+    maml = l2l.algorithms.MAML(model, lr=adapt_lr, first_order=True)
     opt = optim.Adam(maml.parameters(), meta_lr)
     lossfn = torch.nn.MSELoss(reduction='mean')
 
@@ -66,6 +69,7 @@ def train_model(
     step_dict = {f_name: 0 for f_name in train_datasets.keys()}
 
     for epoch in range(epochs):
+        opt.zero_grad()
         meta_train_loss = 0.0
 
         # num_evals = 0
@@ -75,7 +79,7 @@ def train_model(
             support_data = next(iter(task)).to(DEVICE)
             query_data = next(iter(task)).to(DEVICE)
 
-            for _ in range(5):  # adaptation_steps
+            for _ in range(adaptation_steps):  # adaptation_steps
                 support_preds = learner(support_data)
                 support_loss = lossfn(support_data.y, support_preds.view(support_data.num_graphs, -1))
                 learner.adapt(support_loss)
@@ -96,8 +100,9 @@ def train_model(
         
         writer.add_scalar(tag=f"Meta/loss", scalar_value=meta_train_loss.item(), global_step=epoch)
 
-        opt.zero_grad()
         meta_train_loss.backward()
+        torch.nn.utils.clip_grad_norm(maml.parameters(), 1)
+
         opt.step()
     
     return model
@@ -119,15 +124,30 @@ if __name__ == "__main__":
     parser.add_argument("-alr", "--adapt_lr", type=float, default=0.001, help="Adaptation learning rate")
     parser.add_argument("-mlr", "--meta_lr", type=float, default=0.001, help="Meta learning rate")
     parser.add_argument("-ld", "--log_dir", type=str, default=None, help="directory to log stuff")
+    parser.add_argument("-ex", "--exclude", type=str, default="", help="comma seperated list of datasets to exclude")
+    parser.add_argument("-hs", "--hidden_size", type=int, default=32)
+    parser.add_argument("-dp", "--dropout_p", type=float, default=0.2)
+    parser.add_argument("-no", "--node_out_features", type=int, default=10)
     parser.add_argument("-g", "--gpu", action='store_true')
 
     args = parser.parse_args()
     train_dataloader_dict = {}
     test_dataloader_dict = {}
 
+    exclude_list = args.exclude.split(",")
+
     for f in os.listdir(args.data_dir):
         abs_path = os.path.join(args.data_dir, f)
+        CONTINUE_FLAG=False
+        for exclude_file in exclude_list:
+            if f.startswith(exclude_file):
+                CONTINUE_FLAG = True
+
+        if CONTINUE_FLAG:
+            continue
+        
         with open(abs_path, "rb") as infile:
+            logger.info(abs_path)
             data = dill.load(infile)
             train_data, test_data = Dataset.train_test_split(data, num_history=12, shuffle=True, ratio=args.train_size)
 
@@ -138,6 +158,8 @@ if __name__ == "__main__":
 
             train_dataloader_dict[f_name] = train_data_dataloader
             test_dataloader_dict[f_name] = test_data_dataloader
+    
+    logger.info(str(train_dataloader_dict))
     
     WEATHER_FEATURES = train_data.weather_information.shape[-1]
     TIME_FEATURES = train_data.time_encoding.shape[-1]
@@ -159,12 +181,19 @@ if __name__ == "__main__":
         meta_lr=args.meta_lr,
         weather_features=WEATHER_FEATURES,
         time_features=TIME_FEATURES,
+        hidden_size=args.hidden_size,
+        dropout=args.dropout_p,
+        node_out_features=args.node_out_features,
         log_dir=log_dir,
         gpu=args.gpu
     )
 
     model.to("cpu")
     torch.save(model.state_dict(), f"{log_dir}/model.pth")
+
+    args_dict = vars(args)
+    with open(f"{log_dir}/settings.json", "w") as outfile:
+        json.dump(args_dict, outfile)
 
     """end_time = datetime.datetime.now()
     end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
