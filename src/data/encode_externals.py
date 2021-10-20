@@ -68,7 +68,7 @@ def encode_times(datetime_series: pd.Series):
     return encoder.transform(arr).toarray()
 
 
-def time_encoder(time_interval="4H"):
+def time_encoder(time_interval="1H"):
     """
     Creates a time-encoded numpy array.
     Encoding is given by: HOUR X DAY X MONTH
@@ -81,6 +81,7 @@ def time_encoder(time_interval="4H"):
     # hard code a OneHotEncoder that can be used
     encoder = OneHotEncoder()
     time_int = int(time_interval[0])
+    print("time_int")
     if 24 / time_int > 12:
         x_artificial = np.ones((int(24 / time_int), 3))
     else:
