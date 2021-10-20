@@ -15,8 +15,8 @@ cd ~/Thesis/metalearning
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=/zhome/2b/7/117471/Thesis/data/processed/metalearning/yellow-taxi2020-nov-GRID.pkl
-MODEL_PATH=/zhome/2b/7/117471/Thesis/metalearning/METALEARN_MODELS/2021-10-04T15:03:33.015728
+DATA=/zhome/2b/7/117471/Thesis/data/processed/metalearning/yellow-taxi2020-nov-REGION.pkl
+MODEL_PATH=/zhome/2b/7/117471/Thesis/metalearning/metalearn_exp2/2021-10-10T15:30:58.898052
 TRAIN_SIZE=0.9
 BATCH_SIZE=20
 EPOCHS=150
@@ -30,18 +30,17 @@ OPTIMIZER=RMSprop
 
 
 python /zhome/2b/7/117471/Thesis/src/models/finetune_meta.py --data $DATA --model_path $MODEL_PATH --train_size $TRAIN_SIZE --batch_size $BATCH_SIZE --epochs $EPOCHS --weight_decay $WEIGHT_DECAY --learning_rate $LEARNING_RATE --lr_patience $LR_PATIENCE --lr_factor $LR_FACTOR --optimizer $OPTIMIZER --gpu
-
+python /zhome/2b/7/117471/Thesis/src/models/finetune_edgeconv.py --data $DATA --model_path $MODEL_PATH --train_size $TRAIN_SIZE --batch_size $BATCH_SIZE --epochs $EPOCHS --weight_decay $WEIGHT_DECAY --learning_rate $LEARNING_RATE --lr_patience $LR_PATIENCE --lr_factor $LR_FACTOR --optimizer $OPTIMIZER --gpu
 
 
 # TRAINED MODELS
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T13:45:48.841581
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T13:45:52.884588
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T13:45:57.852115
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T13:46:03.133785
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T13:46:10.448014
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T13:46:18.368208
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T14:06:02.254115
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T14:11:42.156506
-# /zhome/2b/7/117471/Thesis/metalearning/2021-10-04T15:03:33.015728
+# /zhome/2b/7/117471/Thesis/metalearning/2021-10-10T15:26:12.999216
+# /zhome/2b/7/117471/Thesis/metalearning/2021-10-10T15:29:59.429279
+# /zhome/2b/7/117471/Thesis/metalearning/2021-10-10T15:30:18.825955
+# /zhome/2b/7/117471/Thesis/metalearning/2021-10-10T15:30:38.752281
+# /zhome/2b/7/117471/Thesis/metalearning/2021-10-10T15:30:40.637652
+# /zhome/2b/7/117471/Thesis/metalearning/2021-10-10T15:30:43.601055
+# /zhome/2b/7/117471/Thesis/metalearning/2021-10-10T15:30:47.529250
+# /zhome/2b/7/117471/Thesis/metalearning/2021-10-10T15:30:58.898052
 
 

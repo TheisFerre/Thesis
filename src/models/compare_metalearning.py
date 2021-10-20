@@ -21,7 +21,7 @@ import logging
 plt.rcParams["figure.figsize"] = (20,5)
 
 DATASET_FOLDER = "/zhome/2b/7/117471/Thesis/data/processed/metalearning"
-METAMODEL_FOLDER = "/zhome/2b/7/117471/Thesis/metalearning/METALEARN_MODELS"
+METAMODEL_FOLDER = "/zhome/2b/7/117471/Thesis/metalearning/metalearn_exp2"
 EDGECONV_FOLDER = "/zhome/2b/7/117471/Thesis/models/metalearn_exp2"
 WEATHER_FEATURES = 4
 TIME_FEATURES = 43
@@ -135,7 +135,7 @@ def load_meta_model(path):
     return edgeconv_meta
 
 
-def load_transfer_model(path):
+def load_transfer_model(path, data_type=None):
     with open(f"{path}/settings.json", "rb") as f:
         edgeconv_params = json.load(f)
     edgeconv_params.pop("data_dir")
@@ -157,9 +157,17 @@ def load_transfer_model(path):
         gpu=True,
         **edgeconv_params
     )
-    edgeconv_transfer_state_dict = torch.load(f"{path}/vanilla_model.pth", map_location=torch.device('cpu'))
+    if data_type is None:
+        edgeconv_transfer_state_dict = torch.load(f"{path}/vanilla_model.pth", map_location=torch.device('cpu'))
+    else:
+        edgeconv_transfer_state_dict = torch.load(f"{path}/finetuned_{data_type}_vanilla_model.pth", map_location=torch.device('cpu'))
     edgeconv_transfer.load_state_dict(edgeconv_transfer_state_dict)
-    return edgeconv_transfer
+    optimizer = torch.optim.SGD(
+        edgeconv_transfer.parameters(), 
+        lr=0.05
+    )
+
+    return edgeconv_transfer, optimizer
 
 
 def weight_reset(m):
@@ -168,7 +176,7 @@ def weight_reset(m):
         m.reset_parameters()
 
 ADAPTATION_STEPS=5
-ADAPT_LR=0.005
+ADAPT_LR=0.05
 META_LR=0.001
 
 
@@ -179,11 +187,13 @@ def eval_models(
     trained_edgeconv,
     finetuned_edgeconv,
     transferlearn_edgeconv,
+    finetuned_transfer,
+    optimizer_transfer,
     datapath, 
     k_shots=5, 
     iterations=30, 
-    adaptation_steps=5, 
-    adapt_lr=0.005,
+    adaptation_steps=10, 
+    adapt_lr=0.05,
     verbose=False
 ):
     open_file = open(datapath, "rb")
@@ -210,29 +220,29 @@ def eval_models(
 
     query_loss_trained = 0
     query_loss_finetuned = 0
-    query_loss_transfer = 0
+    query_loss_finetuned_transfer = 0
     query_loss_baseline = 0
     trained_edgeconv.eval()
     finetuned_edgeconv.eval()
-    transferlearn_edgeconv.eval()
+    finetuned_transfer.eval()
     num_batch_test = 0
     with torch.no_grad():
         for batch in test_loader_eval:
             query_preds_trained = trained_edgeconv(batch.to(DEVICE))
             query_preds_finetuned = finetuned_edgeconv(batch.to(DEVICE))
-            query_preds_transfer = transferlearn_edgeconv(batch.to(DEVICE))
+            query_preds_finetuned_transfer = finetuned_transfer(batch.to(DEVICE))
             query_preds_baseline = batch.x[:, -1, :]
 
             query_loss_trained += lossfn(batch.y, query_preds_trained.view(batch.num_graphs, -1)).item()
             query_loss_finetuned += lossfn(batch.y, query_preds_finetuned.view(batch.num_graphs, -1)).item()
-            query_loss_transfer += lossfn(batch.y, query_preds_transfer.view(batch.num_graphs, -1)).item()
+            query_loss_finetuned_transfer += lossfn(batch.y, query_preds_finetuned_transfer.view(batch.num_graphs, -1)).item()
             query_loss_baseline += lossfn(batch.y, query_preds_baseline.view(batch.num_graphs, -1)).item()
 
             num_batch_test += 1
     
     query_loss_trained = query_loss_trained / num_batch_test
     query_loss_finetuned = query_loss_finetuned / num_batch_test
-    query_loss_transfer = query_loss_transfer / num_batch_test
+    query_loss_finetuned_transfer = query_loss_finetuned_transfer / num_batch_test
     query_loss_baseline = query_loss_baseline / num_batch_test
 
     meta_loss = []
@@ -240,6 +250,7 @@ def eval_models(
     finetuned_loss = []
     untrained_loss = []
     transfer_loss = []
+    finetuned_transfer_loss = []
     baseline_loss = []
 
     for epoch in range(iterations):
@@ -251,6 +262,7 @@ def eval_models(
         if k_shots > 0:
             learner.train()
             untrained_edgeconv.train()
+            transferlearn_edgeconv.train()
             for _ in range(adaptation_steps): # adaptation_steps
                 # Adapt Metalearning model
                 support_preds = learner(support_data)
@@ -263,20 +275,30 @@ def eval_models(
                 loss = lossfn(support_data.y, out.view(support_data.num_graphs, -1))
                 loss.backward()
                 optimizer_untrained.step()
+
+                optimizer_transfer.zero_grad(set_to_none=True)
+                out = transferlearn_edgeconv(support_data)
+                loss = lossfn(support_data.y, out.view(support_data.num_graphs, -1))
+                loss.backward()
+                optimizer_transfer.step()
         
         # PREDICT WITH ALL MODELS
         learner.eval()
         untrained_edgeconv.eval()
+        transferlearn_edgeconv.eval()
         query_loss_meta = 0
         query_loss_untrained = 0
+        query_loss_transfer = 0
         num_batch_test = 0
         with torch.no_grad():
             for batch in test_loader_eval:
                 query_preds_meta = learner(batch.to(DEVICE))
                 query_preds_untrained = untrained_edgeconv(batch.to(DEVICE))
+                query_preds_transfer = transferlearn_edgeconv(batch.to(DEVICE))
 
                 query_loss_meta += lossfn(batch.y, query_preds_meta.view(batch.num_graphs, -1)).item()
                 query_loss_untrained += lossfn(batch.y, query_preds_untrained.view(batch.num_graphs, -1)).item()
+                query_loss_transfer += lossfn(batch.y, query_preds_transfer.view(batch.num_graphs, -1)).item()
 
                 num_batch_test += 1
             
@@ -285,6 +307,9 @@ def eval_models(
 
             query_loss_untrained = query_loss_untrained / num_batch_test
             untrained_loss.append(query_loss_untrained)
+
+            query_loss_transfer = query_loss_transfer / num_batch_test
+            transfer_loss.append(query_loss_transfer)
 
             """learner.eval()
             query_preds_meta = learner(query_data)
@@ -302,7 +327,7 @@ def eval_models(
             #query_loss_finetuned = lossfn(query_data.y, query_preds_finetuned.view(query_data.num_graphs, -1)).cpu()
             finetuned_loss.append(query_loss_finetuned)
 
-            transfer_loss.append(query_loss_transfer)
+            finetuned_transfer_loss.append(query_loss_finetuned_transfer)
 
             #query_loss_baseline = lossfn(query_data.y, query_preds_baseline.view(query_data.num_graphs, -1)).cpu()
             baseline_loss.append(query_loss_baseline)
@@ -318,10 +343,11 @@ def eval_models(
             print(f"Trained Edgeconv loss: {query_loss_trained}")
             print(f"Untrained Edgeconv loss: {query_loss_untrained}")
             print(f"Transfer model loss: {query_loss_transfer}")
+            print(f"Finetuned transfer model loss: {query_loss_finetuned_transfer}")
             print(f"Baseline loss: {query_loss_baseline}")
             print(8 * "#")
         
-    return meta_loss, finetuned_loss, trained_loss, untrained_loss, transfer_loss, baseline_loss
+    return meta_loss, finetuned_loss, trained_loss, untrained_loss, transfer_loss, finetuned_transfer_loss, baseline_loss
 
 
 EVAL_DICT = {}
@@ -342,12 +368,10 @@ for dataset in os.listdir(DATASET_FOLDER):
         
         if dataset.startswith(metamodel_exclude):
             metamodel = load_meta_model(metamodel_abs_path)
-            transferlearn_model = load_transfer_model(metamodel_abs_path)
-            try:
-                finetuned_model = load_finetuned_model(metamodel_abs_path, data_type=TYPE)
-            except exception as e:
-                print(e)
-                finetuned_model = None
+            transferlearn_model, _ = load_transfer_model(metamodel_abs_path)
+            finetuned_transfer, optimizer_transfer = load_transfer_model(metamodel_abs_path, data_type=TYPE)
+            finetuned_model = load_finetuned_model(metamodel_abs_path, data_type=TYPE)
+
             break
     if finetuned_model is None:
         continue
@@ -371,21 +395,26 @@ for dataset in os.listdir(DATASET_FOLDER):
             trained_edgeconv=edgeconv_trained_model.to(DEVICE),
             finetuned_edgeconv=finetuned_model.to(DEVICE),
             transferlearn_edgeconv=transferlearn_model.to(DEVICE),
+            finetuned_transfer=finetuned_transfer.to(DEVICE),
+            optimizer_transfer=optimizer_transfer,
             datapath=dataset_abs_path,
             k_shots=k,
             iterations=30,
-            adaptation_steps=5,
+            adaptation_steps=15,
             adapt_lr=0.05,
             verbose=True
         )
-        meta_loss, finetuned_loss, trained_loss, untrained_loss, transfer_loss, baseline_loss = losses
+        meta_loss, finetuned_loss, trained_loss, untrained_loss, transfer_loss, finetuned_transfer_loss, baseline_loss = losses
         
         EVAL_DICT[dataset][str(k)]["meta_loss"] = np.array(meta_loss)
         EVAL_DICT[dataset][str(k)]["finetuned_loss"] = np.array(finetuned_loss)
         EVAL_DICT[dataset][str(k)]["trained_loss"] = np.array(trained_loss)
         EVAL_DICT[dataset][str(k)]["untrained_loss"] = np.array(untrained_loss)
         EVAL_DICT[dataset][str(k)]["transfer_loss"] = np.array(transfer_loss)
+        EVAL_DICT[dataset][str(k)]["finetuned_transfer_loss"] = np.array(finetuned_transfer_loss)
         EVAL_DICT[dataset][str(k)]["baseline_loss"] = np.array(baseline_loss)
+
+logger.info(f"Saving results to {os.getcwd()}/meta_compare.pkl")
 
 with open("meta_compare.pkl", "wb") as outfile:
     dill.dump(EVAL_DICT, outfile)

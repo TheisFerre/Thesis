@@ -184,8 +184,9 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--optimizer", type=str, default="Adam")
     parser.add_argument("-no", "--node_out_feature", type=int, default=12)
     parser.add_argument("-dp", "--dropout", type=float, default=0.3)
-    parser.add_argument("-k", "--k_neighbours", type=int, default=30)
+    parser.add_argument("-k", "--k_neighbours", type=int, default=20)
     parser.add_argument("-gh", "--graph_hidden_size", type=int, default=32)
+    parser.add_argument("-sd", "--save_dir", type=str, default="")
 
     parser.add_argument("-g", "--gpu", action='store_true')
 
@@ -226,46 +227,70 @@ if __name__ == "__main__":
     sec = int((totsec % 3600) % 60)
     logger.info(f"Total training time: {h}:{m}:{sec}")
     logger.info(f"Average Epoch time: {round(minutes/args.epochs, 2)} minutes")
-    cur_dir = os.getcwd()
-    while True:
-        split_dir = cur_dir.split("/")
-        if "Thesis" not in split_dir:
-            break
-        else:
-            if split_dir[-1] == "Thesis":
+    if len(args.save_dir) > 0 and os.path.exists(args.save_dir):
+        dataset_name = args.data.split("/")[-1].split(".")[0]
+
+        logger.info(f"Saving files to {args.save_dir}/{dataset_name}")
+        try:
+            os.mkdir(f"{args.save_dir}/{dataset_name}")
+        except Exception as e:
+            logger.info(str(e))
+
+        args_dict = vars(args)
+        with open(f"{args.save_dir}/{dataset_name}/settings.json", "w") as outfile:
+            json.dump(args_dict, outfile)
+
+        losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
+        outfile = open(f"{args.save_dir}/{dataset_name}/losses.pkl", "wb")
+        dill.dump(losses_dict, outfile)
+        outfile.close()
+
+        model.to("cpu")
+        torch.save(model.state_dict(), f"{args.save_dir}/{dataset_name}/model.pth")
+
+        logger.info("Files saved successfully")
+
+    else:
+        cur_dir = os.getcwd()
+        while True:
+            split_dir = cur_dir.split("/")
+            if "Thesis" not in split_dir:
                 break
             else:
-                os.chdir("..")
-                cur_dir = os.getcwd()
-    os.chdir("models")
-    cur_dir = os.getcwd()
+                if split_dir[-1] == "Thesis":
+                    break
+                else:
+                    os.chdir("..")
+                    cur_dir = os.getcwd()
+        os.chdir("models")
+        cur_dir = os.getcwd()
 
-    logger.info(f"Saving files to {cur_dir}/{args.model}_{end_time_str}")
-    os.mkdir(f"{args.model}_{end_time_str}")
+        logger.info(f"Saving files to {cur_dir}/{args.model}_{end_time_str}")
+        os.mkdir(f"{args.model}_{end_time_str}")
 
-    args_dict = vars(args)
-    with open(f"{args.model}_{end_time_str}/settings.json", "w") as outfile:
-        json.dump(args_dict, outfile)
+        args_dict = vars(args)
+        with open(f"{args.model}_{end_time_str}/settings.json", "w") as outfile:
+            json.dump(args_dict, outfile)
 
-    losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
-    outfile = open(f"{args.model}_{end_time_str}/losses.pkl", "wb")
-    dill.dump(losses_dict, outfile)
-    outfile.close()
+        losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
+        outfile = open(f"{args.model}_{end_time_str}/losses.pkl", "wb")
+        dill.dump(losses_dict, outfile)
+        outfile.close()
 
-    model.to("cpu")
-    torch.save(model.state_dict(), f"{args.model}_{end_time_str}/model.pth")
+        model.to("cpu")
+        torch.save(model.state_dict(), f"{args.model}_{end_time_str}/model.pth")
 
-    logger.info("Files saved successfully")
+        logger.info("Files saved successfully")
 
-    os.chdir(f"{args.model}_{end_time_str}")
-    os.mkdir(f"logs")
+        os.chdir(f"{args.model}_{end_time_str}")
+        os.mkdir(f"logs")
 
-    target_dir = "logs"
-    source_dir = f"{os.getenv('HOME')}/.lsbatch"
+        target_dir = "logs"
+        source_dir = f"{os.getenv('HOME')}/.lsbatch"
 
-    copy_tree(source_dir, target_dir)
-    
-    for f in os.listdir(target_dir):
-        if not f.endswith("err") and not f.endswith("out"):
-            os.remove(f"{target_dir}/{f}")
+        copy_tree(source_dir, target_dir)
+        
+        for f in os.listdir(target_dir):
+            if not f.endswith("err") and not f.endswith("out"):
+                os.remove(f"{target_dir}/{f}")
     

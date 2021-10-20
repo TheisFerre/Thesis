@@ -67,7 +67,7 @@ def train_model(
     )
 
     model_vanilla.to(DEVICE)
-    opt_finetune = optim.RMSprop(model_vanilla.parameters(), 0.0005)
+    opt_finetune = optim.RMSprop(model_vanilla.parameters(), 0.001) #arbitrarily set lr
 
     model.to(DEVICE)
 
@@ -80,7 +80,6 @@ def train_model(
 
     writer = SummaryWriter(log_dir=log_dir)
     step_dict = {f_name: 0 for f_name in train_datasets.keys()}
-
     for epoch in range(epochs):
         opt.zero_grad()
         query_loss_vanilla = 0
@@ -97,11 +96,9 @@ def train_model(
                 support_preds = learner(support_data)
                 support_loss = lossfn(support_data.y, support_preds.view(support_data.num_graphs, -1))
                 learner.adapt(support_loss)
-
                 opt_finetune.zero_grad(set_to_none=True)
                 out = model_vanilla(support_data)
                 loss = lossfn(support_data.y, out.view(support_data.num_graphs, -1))
-
                 loss.backward()
                 opt_finetune.step()
             
