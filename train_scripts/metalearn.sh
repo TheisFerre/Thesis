@@ -15,23 +15,23 @@ cd ~/Thesis/metalearning
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA_DIR=/zhome/2b/7/117471/Thesis/data/processed/metalearning
+DATA_DIR=/zhome/2b/7/117471/Thesis/data/processed/metalearning_augmented/DATA-NOT-BIKES
 TRAIN_SIZE=0.9
-BATCH_TASK_SIZE=8
+BATCH_TASK_SIZE=10
 K_SHOT=5
-ADAPTATION_STEPS=5
+ADAPTATION_STEPS=10
 EPOCHS=250
 ADAPT_LR=0.05
 META_LR=0.001
-EXCLUDE=yellow
-LOG_DIR=/zhome/2b/7/117471/Thesis/metalearning
+#EXCLUDE=citibike-tripdata
+LOG_DIR=/zhome/2b/7/117471/Thesis/metalearning/NOT-BIKES
 HIDDEN_SIZE=46
 DROPOUT_P=0.2
 NODE_OUT_FEATURES=10
 
 
 python /zhome/2b/7/117471/Thesis/src/models/train_meta.py --data_dir $DATA_DIR --train_size $TRAIN_SIZE --batch_task_size $BATCH_TASK_SIZE \
---k_shot $K_SHOT --adaptation_steps $ADAPTATION_STEPS --epochs $EPOCHS --adapt_lr $ADAPT_LR --meta_lr $META_LR --log_dir $LOG_DIR --exclude $EXCLUDE \
+--k_shot $K_SHOT --adaptation_steps $ADAPTATION_STEPS --epochs $EPOCHS --adapt_lr $ADAPT_LR --meta_lr $META_LR --log_dir $LOG_DIR \
 --hidden_size $HIDDEN_SIZE --dropout_p $DROPOUT_P --node_out_features $NODE_OUT_FEATURES --gpu
 
 

@@ -165,7 +165,7 @@ if __name__ == "__main__":
         abs_path = os.path.join(args.data_dir, f)
         CONTINUE_FLAG=False
         for exclude_file in exclude_list:
-            if f.startswith(exclude_file):
+            if f.startswith(exclude_file) and len(exclude_file) > 0:
                 CONTINUE_FLAG = True
 
         if CONTINUE_FLAG:

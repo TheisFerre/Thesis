@@ -20,9 +20,9 @@ from src.visualization.visualize import plot_losses
 import logging
 plt.rcParams["figure.figsize"] = (20,5)
 
-DATASET_FOLDER = "/zhome/2b/7/117471/Thesis/data/processed/metalearning"
-METAMODEL_FOLDER = "/zhome/2b/7/117471/Thesis/metalearning/metalearn_exp2"
-EDGECONV_FOLDER = "/zhome/2b/7/117471/Thesis/models/metalearn_exp2"
+DATASET_FOLDER = "/zhome/2b/7/117471/Thesis/data/processed/metalearning_augmented/DATA-HOUR1"
+METAMODEL_FOLDER = "/zhome/2b/7/117471/Thesis/metalearning/NOT-HOUR1"
+EDGECONV_FOLDER = "/zhome/2b/7/117471/Thesis/models/metalearning_augmented/time-experiment"
 WEATHER_FEATURES = 4
 TIME_FEATURES = 43
 
@@ -84,6 +84,7 @@ def load_edgeconv_model(path, trained=True):
     edgeconv_params.pop("optimizer")
     edgeconv_params.pop("k_neighbours")
     edgeconv_params.pop("graph_hidden_size")
+    edgeconv_params.pop("save_dir")
     edgeconv_params["node_out_features"] = edgeconv_params.pop("node_out_feature")
     edgeconv_params["dropout_p"] = edgeconv_params.pop("dropout")
 
@@ -352,7 +353,7 @@ def eval_models(
 
 EVAL_DICT = {}
 for dataset in os.listdir(DATASET_FOLDER):
-    if dataset == "citibike-tripdata-REGION.pkl":
+    if dataset == "citibike-tripdata-HOUR1-REGION.pkl":
         continue
     if "GRID" in dataset:
         TYPE = "GRID"
@@ -416,7 +417,7 @@ for dataset in os.listdir(DATASET_FOLDER):
 
 logger.info(f"Saving results to {os.getcwd()}/meta_compare.pkl")
 
-with open("meta_compare.pkl", "wb") as outfile:
+with open("NOT-HOUR1-meta_compare.pkl", "wb") as outfile:
     dill.dump(EVAL_DICT, outfile)
 
 

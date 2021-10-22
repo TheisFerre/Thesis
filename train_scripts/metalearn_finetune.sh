@@ -15,8 +15,8 @@ cd ~/Thesis/metalearning
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=/zhome/2b/7/117471/Thesis/data/processed/metalearning/yellow-taxi2020-nov-REGION.pkl
-MODEL_PATH=/zhome/2b/7/117471/Thesis/metalearning/metalearn_exp2/2021-10-10T15:30:58.898052
+DATA=/zhome/2b/7/117471/Thesis/data/processed/metalearning_augmented/DATA-HOUR1/citibike-tripdata-HOUR1-GRID10.pkl
+MODEL_PATH=/zhome/2b/7/117471/Thesis/metalearning/NOT-HOUR1/2021-10-20T12:25:02.224325
 TRAIN_SIZE=0.9
 BATCH_SIZE=20
 EPOCHS=150
