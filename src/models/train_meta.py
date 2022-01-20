@@ -56,7 +56,7 @@ def train_model(
         dropout_p=dropout
     )
 
-    model_vanilla = Edgeconvmodel(
+    """model_vanilla = Edgeconvmodel(
         node_in_features=1,
         weather_features=weather_features,
         time_features=time_features,
@@ -67,7 +67,7 @@ def train_model(
     )
 
     model_vanilla.to(DEVICE)
-    opt_finetune = optim.RMSprop(model_vanilla.parameters(), 0.001) #arbitrarily set lr
+    opt_finetune = optim.RMSprop(model_vanilla.parameters(), 0.001) #arbitrarily set lr"""
 
     model.to(DEVICE)
 
@@ -96,25 +96,25 @@ def train_model(
                 support_preds = learner(support_data)
                 support_loss = lossfn(support_data.y, support_preds.view(support_data.num_graphs, -1))
                 learner.adapt(support_loss)
-                opt_finetune.zero_grad(set_to_none=True)
-                out = model_vanilla(support_data)
-                loss = lossfn(support_data.y, out.view(support_data.num_graphs, -1))
-                loss.backward()
-                opt_finetune.step()
+                #opt_finetune.zero_grad(set_to_none=True)
+                #out = model_vanilla(support_data)
+                #loss = lossfn(support_data.y, out.view(support_data.num_graphs, -1))
+                #loss.backward()
+                #opt_finetune.step()
             
             query_preds = learner(query_data)
             query_loss = lossfn(query_data.y, query_preds.view(query_data.num_graphs, -1))
             writer.add_scalar(tag=f"{f_name}/query_loss", scalar_value=query_loss.item(), global_step=step_dict[f_name])
             step_dict[f_name] += 1
 
-            with torch.no_grad():
+            """with torch.no_grad():
                 out = model_vanilla(query_data)
                 loss = lossfn(query_data.y, out.view(query_data.num_graphs, -1))
-                query_loss_vanilla += loss
+                query_loss_vanilla += loss"""
 
             meta_train_loss += query_loss
 
-        query_loss_vanilla = query_loss_vanilla / batch_task_size
+        #query_loss_vanilla = query_loss_vanilla / batch_task_size
         meta_train_loss = meta_train_loss / batch_task_size
 
         if epoch % 1 == 0:
@@ -123,14 +123,14 @@ def train_model(
             print(8 * "#")
         
         writer.add_scalar(tag=f"Meta/loss", scalar_value=meta_train_loss.item(), global_step=epoch)
-        writer.add_scalar(tag=f"vanilla/loss", scalar_value=query_loss_vanilla.item(), global_step=epoch)
+        #writer.add_scalar(tag=f"vanilla/loss", scalar_value=query_loss_vanilla.item(), global_step=epoch)
 
         meta_train_loss.backward()
         torch.nn.utils.clip_grad_norm(maml.parameters(), 1)
 
         opt.step()
     
-    return model, model_vanilla
+    return model#, model_vanilla
 
 
 
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     else:
         log_dir = None
 
-    model, vanilla_model = train_model(
+    model = train_model(
         train_datasets=train_dataloader_dict,
         test_datasets=test_dataloader_dict,
         adaptation_steps=args.adaptation_steps,
@@ -216,8 +216,8 @@ if __name__ == "__main__":
     model.to("cpu")
     torch.save(model.state_dict(), f"{log_dir}/model.pth")
 
-    vanilla_model.to("cpu")
-    torch.save(vanilla_model.state_dict(), f"{log_dir}/vanilla_model.pth")
+    #vanilla_model.to("cpu")
+    #torch.save(vanilla_model.state_dict(), f"{log_dir}/vanilla_model.pth")
 
     args_dict = vars(args)
     with open(f"{log_dir}/settings.json", "w") as outfile:

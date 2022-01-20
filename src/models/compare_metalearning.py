@@ -20,9 +20,9 @@ from src.visualization.visualize import plot_losses
 import logging
 plt.rcParams["figure.figsize"] = (20,5)
 
-DATASET_FOLDER = "/zhome/2b/7/117471/Thesis/data/processed/metalearning_augmented/DATA-HOUR1"
-METAMODEL_FOLDER = "/zhome/2b/7/117471/Thesis/metalearning/NOT-HOUR1"
-EDGECONV_FOLDER = "/zhome/2b/7/117471/Thesis/models/metalearning_augmented/time-experiment"
+DATASET_FOLDER = "/zhome/2b/7/117471/Thesis/data/processed/metalearning"
+METAMODEL_FOLDER = "/zhome/2b/7/117471/Thesis/metalearning/NOT-BIKES/not-augmented/finetuned_models"
+EDGECONV_FOLDER = "/zhome/2b/7/117471/Thesis/models/metalearning_non-augmented"
 WEATHER_FEATURES = 4
 TIME_FEATURES = 43
 
@@ -84,7 +84,8 @@ def load_edgeconv_model(path, trained=True):
     edgeconv_params.pop("optimizer")
     edgeconv_params.pop("k_neighbours")
     edgeconv_params.pop("graph_hidden_size")
-    edgeconv_params.pop("save_dir")
+    if "save_dir" in edgeconv_params:
+        edgeconv_params.pop("save_dir")
     edgeconv_params["node_out_features"] = edgeconv_params.pop("node_out_feature")
     edgeconv_params["dropout_p"] = edgeconv_params.pop("dropout")
 
@@ -353,7 +354,8 @@ def eval_models(
 
 EVAL_DICT = {}
 for dataset in os.listdir(DATASET_FOLDER):
-    if dataset == "citibike-tripdata-HOUR1-REGION.pkl":
+    #if dataset == "citibike-tripdata-HOUR1-REGION.pkl":
+    if "citibike" not in dataset:
         continue
     if "GRID" in dataset:
         TYPE = "GRID"
@@ -364,10 +366,15 @@ for dataset in os.listdir(DATASET_FOLDER):
 
     for metamodel_path in os.listdir(METAMODEL_FOLDER):
         metamodel_abs_path = os.path.abspath(os.path.join(METAMODEL_FOLDER, metamodel_path))
-        with open(f"{metamodel_abs_path}/settings.json") as settings_json:
-            metamodel_exclude = json.load(settings_json)["exclude"]
+        # with open(f"{metamodel_abs_path}/settings.json") as settings_json:
+        #     metamodel_exclude = json.load(settings_json)["exclude"]
+
         
-        if dataset.startswith(metamodel_exclude):
+        # if dataset.startswith(metamodel_exclude):
+        if dataset.startswith(metamodel_path):
+            logger.info("hello")
+            logger.info(dataset)
+            logger.info(metamodel_path)
             metamodel = load_meta_model(metamodel_abs_path)
             transferlearn_model, _ = load_transfer_model(metamodel_abs_path)
             finetuned_transfer, optimizer_transfer = load_transfer_model(metamodel_abs_path, data_type=TYPE)
@@ -401,7 +408,7 @@ for dataset in os.listdir(DATASET_FOLDER):
             datapath=dataset_abs_path,
             k_shots=k,
             iterations=30,
-            adaptation_steps=15,
+            adaptation_steps=5,
             adapt_lr=0.05,
             verbose=True
         )
@@ -417,7 +424,7 @@ for dataset in os.listdir(DATASET_FOLDER):
 
 logger.info(f"Saving results to {os.getcwd()}/meta_compare.pkl")
 
-with open("NOT-HOUR1-meta_compare.pkl", "wb") as outfile:
+with open("NON-AUGMENTED-meta_compare.pkl", "wb") as outfile:
     dill.dump(EVAL_DICT, outfile)
 
 

@@ -15,7 +15,7 @@ cd ~/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=/zhome/2b/7/117471/Thesis/data/processed/METR-LA-HOUR1-REGION.pkl
+DATA=/zhome/2b/7/117471/Thesis/data/processed/metalearning/capitalbikeshare-tripdata-HOUR1-GRID10.pkl
 MODEL=edgeconv
 NUM_HISTORY=12
 TRAIN_SIZE=0.9
@@ -29,11 +29,11 @@ OPTIMIZER=RMSprop
 NODE_OUT_FEATURES=10
 HIDDEN_SIZE=46
 DROPOUT_P=0.2
-SAVE_DIR=/zhome/2b/7/117471/Thesis/models
+SAVE_DIR=/zhome/2b/7/117471/Thesis/CASESTUDY
 
 
 
-python train_model.py --data $DATA --model $MODEL --num_history $NUM_HISTORY --train_size $TRAIN_SIZE \
+python train_multiple_edgeconv.py --data $DATA --model $MODEL --num_history $NUM_HISTORY --train_size $TRAIN_SIZE \
 --batch_size $BATCH_SIZE --epochs $EPOCHS --weight_decay $WEIGHT_DECAY --learning_rate $LEARNING_RATE \
 --lr_factor $LR_FACTOR --lr_patience $LR_PATIENCE --optimizer $OPTIMIZER --hidden_size $HIDDEN_SIZE \
 --node_out_feature $NODE_OUT_FEATURES --dropout $DROPOUT_P --save_dir $SAVE_DIR --gpu

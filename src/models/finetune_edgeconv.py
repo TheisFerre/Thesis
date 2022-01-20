@@ -140,6 +140,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--epochs", type=int, default=200, help="number of epochs")
     parser.add_argument("-wd", "--weight_decay", type=float, default=0.0, help="Amount of weight decay in optimizer")
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.001, help="learning rate")
+    parser.add_argument("-sd", "--save_to_dir", action='store_true')
     parser.add_argument(
         "-f", "--lr_factor", type=float, default=1, help="factor for reduing learning rate with lr scheduler"
     )
@@ -188,17 +189,35 @@ if __name__ == "__main__":
 
     logger.info(f"Saving files to: {args.model_path}")
 
-    args_dict = vars(args)
-    with open(f"{args.model_path}/finetune_{TYPE}_vanilla_settings.json", "w") as outfile:
-        json.dump(args_dict, outfile)
-    
-    model.to("cpu")
-    torch.save(model.state_dict(), f"{args.model_path}/finetuned_{TYPE}_vanilla_model.pth")
+    if args.save_to_dir:
+        args_dict = vars(args)
+        args_dict.pop("save_to_dir")
+        save_dir = args.data.split("/")[-1].split(".")[0]
+        if not os.path.exists(f"{args.model_path}/{save_dir}"):
+            os.mkdir(f"{args.model_path}/{save_dir}")
+        with open(f"{args.model_path}/{save_dir}/finetune_{TYPE}_vanilla_settings.json", "w") as outfile:
+            json.dump(args_dict, outfile)
+        
+        model.to("cpu")
+        torch.save(model.state_dict(), f"{args.model_path}/{save_dir}/finetuned_{TYPE}_vanilla_model.pth")
 
-    losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
-    outfile = open(f"{args.model_path}/finetune_{TYPE}_vanilla_losses.pkl", "wb")
-    dill.dump(losses_dict, outfile)
-    outfile.close()
+        losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
+        outfile = open(f"{args.model_path}/{save_dir}/finetune_{TYPE}_vanilla_losses.pkl", "wb")
+        dill.dump(losses_dict, outfile)
+        outfile.close()
+    else:
+        args_dict = vars(args)
+        args_dict.pop("save_to_dir")
+        with open(f"{args.model_path}/finetune_{TYPE}_vanilla_settings.json", "w") as outfile:
+            json.dump(args_dict, outfile)
+        
+        model.to("cpu")
+        torch.save(model.state_dict(), f"{args.model_path}/finetuned_{TYPE}_vanilla_model.pth")
+
+        losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
+        outfile = open(f"{args.model_path}/finetune_{TYPE}_vanilla_losses.pkl", "wb")
+        dill.dump(losses_dict, outfile)
+        outfile.close()
 
 
 
