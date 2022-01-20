@@ -18,8 +18,7 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def train_model(
     dataset: Dataset,
-    num_history: int = 8,
-    train_size: float = 0.8,
+    num_start_obs: int,
     batch_size: int = 32,
     epochs: int = 200,
     model: str = "edgeconv",
@@ -36,17 +35,24 @@ def train_model(
     gpu: bool = False
 ):
 
-    train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=12, ratio=train_size, shuffle=True)
+    train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=12, ratio=0.991, shuffle=False)
 
     train_data_list = []
-    for i in range(len(train_dataset)):
-        train_data_list.append(train_dataset[i])
-    train_loader = DataLoader(train_data_list, batch_size=batch_size, shuffle=True)
-
     test_data_list = []
-    for i in range(len(test_dataset)):
-        test_data_list.append(test_dataset[i])
-    test_loader = DataLoader(test_data_list, batch_size=batch_size, shuffle=True)
+    for i in range(len(train_dataset)):
+        if i < num_start_obs:
+            train_data_list.append(train_dataset[i])
+        else:
+            test_data_list.append(train_dataset[i])
+    if num_start_obs < batch_size:
+        train_loader = DataLoader(train_data_list, batch_size=num_start_obs, shuffle=True)
+        test_loader = DataLoader(test_data_list, batch_size=batch_size, shuffle=True)
+    elif (num_start_obs + batch_size) > len(train_dataset):
+        train_loader = DataLoader(train_data_list, batch_size=batch_size, shuffle=True)
+        test_loader = DataLoader(test_data_list, batch_size=1, shuffle=True)
+    else:
+        train_loader = DataLoader(train_data_list, batch_size=batch_size, shuffle=True)
+        test_loader = DataLoader(test_data_list, batch_size=batch_size, shuffle=True)
 
     weather_features = train_dataset.weather_information.shape[-1]
     time_features = train_dataset.time_encoding.shape[-1]
@@ -117,6 +123,8 @@ def train_model(
         scheduler = ReduceLROnPlateau(optimizer, "min", factor=lr_factor, patience=lr_patience)
     train_losses = []
     test_losses = []
+    best_loss = 100
+    patience = 0
 
     for EPOCH in range(epochs):
         model.eval()
@@ -158,6 +166,15 @@ def train_model(
             logger.info(f"Epoch avg RMSE loss (TRAIN): {train_losses[-1]}")
             logger.info(f"Epoch avg RMSE loss (TEST): {test_losses[-1]}")
             logger.info("-" * 10)
+        
+        if test_losses[-1] < best_loss:
+            best_loss = test_losses[-1]
+            patience = 0
+        else:
+            patience += 1
+
+        if patience > 35:
+            return model, train_losses, test_losses
 
     return model, train_losses, test_losses
 
@@ -197,100 +214,48 @@ if __name__ == "__main__":
     start_time = datetime.datetime.now()
     logger.info(str(vars(args)))
     logger.info(open_file)
-    logger.info(f"Fitting model at time: {str(start_time)}")
-    model, train_loss, test_loss = train_model(
-        dataset=dataset,
-        num_history=args.num_history,
-        train_size=args.train_size,
-        batch_size=args.batch_size,
-        epochs=args.epochs,
-        model=args.model,
-        weight_decay=args.weight_decay,
-        learning_rate=args.learning_rate,
-        lr_factor=args.lr_factor,
-        lr_patience=args.lr_patience,
-        optimizer_name=args.optimizer,
-        hidden_size=args.hidden_size,
-        dropout_p=args.dropout,
-        node_out_feature=args.node_out_feature,
-        k=args.k_neighbours,
-        graph_hidden_size=args.graph_hidden_size,
-        gpu=args.gpu
-    )
-    end_time = datetime.datetime.now()
-    end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
-    td = end_time - start_time
-    minutes = round(td.total_seconds() / 60, 2)
-    totsec = td.total_seconds()
-    h = int(totsec // 3600)
-    m = int((totsec % 3600) // 60)
-    sec = int((totsec % 3600) % 60)
-    logger.info(f"Total training time: {h}:{m}:{sec}")
-    logger.info(f"Average Epoch time: {round(minutes/args.epochs, 2)} minutes")
-    if len(args.save_dir) > 0 and os.path.exists(args.save_dir):
-        dataset_name = args.data.split("/")[-1].split(".")[0]
 
-        logger.info(f"Saving files to {args.save_dir}/{dataset_name}")
-        try:
-            os.mkdir(f"{args.save_dir}/{dataset_name}")
-        except Exception as e:
-            logger.info(str(e))
+    # We have 700 observations. We make a model that is trained on all data every 25 datapoint
+    # this will give us 28 models. However, we don't need a model that is trained on all the data
+    for i in range(28 - 1):
+        start_idx = i * 25
+        end_idx = (i+1) * 25
+        logger.info(f"Fitting model at time: {str(start_time)}")
+        model, train_loss, test_loss = train_model(
+            dataset=dataset,
+            num_start_obs=end_idx,
+            batch_size=args.batch_size,
+            epochs=args.epochs,
+            model=args.model,
+            weight_decay=args.weight_decay,
+            learning_rate=args.learning_rate,
+            lr_factor=args.lr_factor,
+            lr_patience=args.lr_patience,
+            optimizer_name=args.optimizer,
+            hidden_size=args.hidden_size,
+            dropout_p=args.dropout,
+            node_out_feature=args.node_out_feature,
+            k=args.k_neighbours,
+            graph_hidden_size=args.graph_hidden_size,
+            gpu=args.gpu
+        )
+        end_time = datetime.datetime.now()
+        end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+        td = end_time - start_time
+        minutes = round(td.total_seconds() / 60, 2)
+        totsec = td.total_seconds()
+        h = int(totsec // 3600)
+        m = int((totsec % 3600) // 60)
+        sec = int((totsec % 3600) % 60)
+        logger.info(f"Total training time: {h}:{m}:{sec}")
+        logger.info(f"Average Epoch time: {round(minutes/args.epochs, 2)} minutes")
+        if len(args.save_dir) > 0 and os.path.exists(args.save_dir):
+            dataset_name = args.data.split("/")[-1].split(".")[0]
 
-        args_dict = vars(args)
-        with open(f"{args.save_dir}/{dataset_name}/settings.json", "w") as outfile:
-            json.dump(args_dict, outfile)
+            logger.info(f"Saving files to {args.save_dir}/{dataset_name}")
 
-        losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
-        outfile = open(f"{args.save_dir}/{dataset_name}/losses.pkl", "wb")
-        dill.dump(losses_dict, outfile)
-        outfile.close()
+            model.to("cpu")
+            torch.save(model.state_dict(), f"{args.save_dir}/{dataset_name}/{str(end_idx)}-model.pth")
 
-        model.to("cpu")
-        torch.save(model.state_dict(), f"{args.save_dir}/{dataset_name}/model.pth")
-
-        logger.info("Files saved successfully")
-
-    else:
-        cur_dir = os.getcwd()
-        while True:
-            split_dir = cur_dir.split("/")
-            if "Thesis" not in split_dir:
-                break
-            else:
-                if split_dir[-1] == "Thesis":
-                    break
-                else:
-                    os.chdir("..")
-                    cur_dir = os.getcwd()
-        os.chdir("models")
-        cur_dir = os.getcwd()
-
-        logger.info(f"Saving files to {cur_dir}/{args.model}_{end_time_str}")
-        os.mkdir(f"{args.model}_{end_time_str}")
-
-        args_dict = vars(args)
-        with open(f"{args.model}_{end_time_str}/settings.json", "w") as outfile:
-            json.dump(args_dict, outfile)
-
-        losses_dict = {"train_loss": train_loss, "test_loss": test_loss}
-        outfile = open(f"{args.model}_{end_time_str}/losses.pkl", "wb")
-        dill.dump(losses_dict, outfile)
-        outfile.close()
-
-        model.to("cpu")
-        torch.save(model.state_dict(), f"{args.model}_{end_time_str}/model.pth")
-
-        logger.info("Files saved successfully")
-
-        os.chdir(f"{args.model}_{end_time_str}")
-        os.mkdir(f"logs")
-
-        target_dir = "logs"
-        source_dir = f"{os.getenv('HOME')}/.lsbatch"
-
-        copy_tree(source_dir, target_dir)
-        
-        for f in os.listdir(target_dir):
-            if not f.endswith("err") and not f.endswith("out"):
-                os.remove(f"{target_dir}/{f}")
-    
+            logger.info(f"model '{str(end_idx)}-model.pth' saved successfully")
+            torch.cuda.empty_cache()

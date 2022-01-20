@@ -1,4 +1,4 @@
-from src.models.models import Edgeconvmodel, GATLSTM, Encoder, Decoder, STGNNModel
+from src.models.models import Edgeconvmodel, BaselineGNNLSTM, Encoder, Decoder, STGNNModel
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -17,47 +17,51 @@ from optuna.trial import TrialState
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-open_file = open("../../data/processed/202106-citibike-tripdata.pkl", "rb")
+open_file = open("/home/s163700/Thesis/data/processed/citibike2014-tripdata-regions.pkl", "rb")
 dataset = dill.load(open_file)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def objective(trial):
 
 
-    train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=12, ratio=0.8)
+    train_dataset, test_dataset = Dataset.train_test_split(dataset, num_history=12, ratio=0.9421, shuffle=False)
 
     train_data_list = []
-    for i in range(len(train_dataset)):
+    np.random.seed(42)
+    random_idx = np.random.permutation((len(train_dataset)))
+    random_idx_subset = random_idx[0:int(len(random_idx) * 0.25)]
+
+
+    for i in random_idx_subset:
         train_data_list.append(train_dataset[i])
-    train_loader = DataLoader(train_data_list, batch_size=64, shuffle=True)
+    train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True)
 
     test_data_list = []
     for i in range(len(test_dataset)):
         test_data_list.append(test_dataset[i])
-    test_loader = DataLoader(test_data_list, batch_size=64, shuffle=True)
+    test_loader = DataLoader(test_data_list, batch_size=32, shuffle=True)
 
     weather_features = train_dataset.weather_information.shape[-1]
     time_features = train_dataset.time_encoding.shape[-1]
 
     # GET OPTIMIZATION INFORMATION!
 
-    optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop"])
+    optimizer_name = "RMSprop"
     node_out_features = trial.suggest_int("node_out_features", 6, 32)
     hidden_size = trial.suggest_int("hidden_size", 12, 64)
+    graph_hidden_size = trial.suggest_int("graph_hidden_size", 8, 48)
     dropout_p = trial.suggest_float("dropout_p", 0.2, 0.6)
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 0.5, log=True)
     learning_rate = trial.suggest_float("lr", 1e-6, 1e-2, log=True)
 
-    model = GATLSTM(
+    model = BaselineGNNLSTM(
         node_in_features=1,
         weather_features=weather_features,
         time_features=time_features,
         node_out_features=node_out_features,
         hidden_size=hidden_size,
         dropout_p=dropout_p,
+        graph_hidden_size=graph_hidden_size,
         gpu=True
     )
 
@@ -125,10 +129,20 @@ def objective(trial):
 
 if __name__ == "__main__":
     start_time = datetime.datetime.now()
+    logging.basicConfig(
+        filename="/home/s163700/Thesis/models/gatlstm-logs.log",
+        filemode='a',
+        format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+        datefmt='%H:%M:%S',
+        level=logging.INFO
+    )
+
+    logger = logging.getLogger(__name__)
+
     logger.info(f"Starting search: {str(start_time)}")
     study = optuna.create_study(
         direction="minimize", 
-        pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=50, interval_steps=10)
+        pruner=optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=40, interval_steps=10)
     )
     study.optimize(objective, n_trials=75)
     end_time = datetime.datetime.now()

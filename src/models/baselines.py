@@ -5,6 +5,7 @@ from src.models.models import CustomTemporalSignal
 from sklearn.preprocessing import StandardScaler
 import pmdarima as pm
 from pmdarima.model_selection import train_test_split
+from src.utils import compute_mae, compute_mape
 
 
 def historical_average(
@@ -23,12 +24,17 @@ def historical_average(
             HA = np.expand_dims(HA, 0)
             HA = np.repeat(HA, test_data.targets.shape[0], 0)
             MSE = ((HA - test_targets)**2).mean()
+            MAE = compute_mae(test_targets, HA)
+            MAPE = compute_mape(test_targets, HA)
+
         else:
             train_targets = train_data.targets
             test_targets = test_data.targets
             HA = train_targets.mean(0)
             HA = HA.repeat(test_data.targets.shape[0], 1)
             MSE = (HA - test_targets).pow(2).mean()
+            MAE = compute_mae(test_targets, HA)
+            MAPE = compute_mape(test_targets, HA)
     else:
         if scaler is not None:
             train_targets = scaler.inverse_transform(train_data)
@@ -38,7 +44,7 @@ def historical_average(
             test_targets = test_data
         MSE = ((train_targets - test_targets) ** 2).mean()
 
-    return float(MSE)
+    return MSE, MAE, MAPE
 
 
 def ARIMA(targets: np.array, train_size: float = 0.8):

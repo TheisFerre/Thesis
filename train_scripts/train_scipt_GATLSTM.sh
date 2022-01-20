@@ -4,7 +4,7 @@
 #BSUB -gpu "num=1:mode=exclusive_process" #How the job will be run on the VM, here I request 1 GPU with exclusive access i.e. only my c #BSUB -n 1 How many CPU cores my job request
 #BSUB -W 24:00 #The maximum runtime my job have note that the queuing might enable shorter jobs earlier due to scheduling.
 #BSUB -R "span[hosts=1]" #How many nodes the job requests
-#BSUB -R "rusage[mem=40GB]" #How much RAM the job should have access to
+#BSUB -R "rusage[mem=12GB]" #How much RAM the job should have access to
 #BSUB -R "select[gpu32gb]" #For requesting the extra big GPU w. 32GB of VRAM
 #BSUB -o logs/OUTPUT.%J #Log file
 #BSUB -e logs/ERROR.%J #Error log file
@@ -15,11 +15,11 @@ cd ~/Thesis/src/models
 
 source ~/Thesis/venv-thesis/bin/activate
 
-DATA=../../data/processed/citibike-tripdata.pkl
+DATA=../../data/processed/citibike2014-tripdata-regions.pkl
 MODEL=gatlstm
 NUM_HISTORY=12
-TRAIN_SIZE=0.8
-BATCH_SIZE=64
+TRAIN_SIZE=0.9421
+BATCH_SIZE=32
 EPOCHS=250
 WEIGHT_DECAY=0.000001
 LEARNING_RATE=0.003
